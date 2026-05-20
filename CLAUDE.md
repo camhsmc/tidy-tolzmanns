@@ -140,14 +140,21 @@ Kara reported the app feeling glitchy. Did a careful code audit + listed 12 find
 - **Cancel silently discarded form edits** — `openDaySheet` now snapshots `{picker, area, note}` into `state.daySheetInitial`. Cancel-button handler runs `isDaySheetDirty()` and `confirm('Discard your changes?')` before closing. Save and Delete close without prompting (since intent is explicit).
 
 **Not yet fixed (lower-priority findings from the audit)**
-- `predictPicker` for dates *before* the earliest existing row always returns Kara — should walk backward through the rotation from the earliest known row
-- Toggle-button in-place update always removes `.meta`; re-marking after unmarking loses the original minutes/note (the new completion has none)
 - 5-min midnight refresh doesn't auto-close an open day sheet
 - `loadRecent` issues a long `.in('day_id', ids)` URL after many months of data
 - Today-tab "your turn to pick" form is a parallel flow to the day-sheet for today
-- No backdrop-tap to close the day sheet
 - Streak breaks on legitimately skipped rotation days
 - `confirm()` native dialog is jarring vs the warm UI
+- Accidental double-tap on calendar cells; no `user-scalable=no` in viewport (mobile zoom risk)
+
+## Session — 2026-05-20 (QA pass 2)
+
+Next 3 priorities:
+
+**Fixed**
+- **Backdrop-tap to close** (`name-picker-wrap` is the backdrop). Day-sheet wrap and switch-user name-picker wrap now listen for clicks where `ev.target === wrap` and close on backdrop click. Day-sheet path runs the dirty check first. First-run name picker is unchanged — they must pick a name.
+- **Toggle re-mark used to silently wipe minutes/note**. `togglePersonDone` now confirms before deleting a completion that has `minutes_spent` or `note` content. Confirm shows the data being lost (e.g. `Remove Rachel's entry (25 min · "cleaned closet")?`). Confirm cancel returns early; toggle handler re-enables the button so its state stays "✓ Done".
+- **`predictPicker` for pre-history backfill**. When there are no rows before `ymd` (e.g. backfilling April before the app existed), it now walks *backward* from the earliest later row. So if May 18 = Kara is the first row, backfilling May 17 suggests Gail (Kara − 1 step), not Kara.
 
 ## Open questions / future
 

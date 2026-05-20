@@ -595,18 +595,27 @@ function computeStreak(name) {
 }
 
 function predictPicker(ymd) {
-  // Predict whose turn `ymd` falls on, assuming one rotation step per calendar day
-  // forward from the most recent row before `ymd`. Skipped days will shift actuals,
-  // but for a daily-cleaning family this is a useful hint.
-  const prior = state.recentDays.filter(r => r.day_date < ymd);
-  if (prior.length === 0) return NAMES[0];
-  prior.sort((a, b) => a.day_date < b.day_date ? 1 : -1);
-  const latest = prior[0];
-  const latestDate = new Date(latest.day_date + 'T12:00:00');
+  // Predict whose turn `ymd` falls on, assuming one rotation step per calendar day.
+  // Prefer walking forward from the latest prior row; fall back to walking backward
+  // from the earliest later row (for backfilling dates before the app existed).
   const targetDate = new Date(ymd + 'T12:00:00');
-  const dayDiff = Math.round((targetDate - latestDate) / (24 * 3600 * 1000));
-  const startIdx = NAMES.indexOf(latest.picker);
-  return NAMES[(startIdx + dayDiff) % NAMES.length];
+  const prior = state.recentDays.filter(r => r.day_date < ymd);
+  if (prior.length > 0) {
+    prior.sort((a, b) => a.day_date < b.day_date ? 1 : -1);
+    const latest = prior[0];
+    const dayDiff = Math.round((targetDate - new Date(latest.day_date + 'T12:00:00')) / (24 * 3600 * 1000));
+    const startIdx = NAMES.indexOf(latest.picker);
+    return NAMES[(startIdx + dayDiff) % NAMES.length];
+  }
+  const later = state.recentDays.filter(r => r.day_date > ymd);
+  if (later.length > 0) {
+    later.sort((a, b) => a.day_date < b.day_date ? -1 : 1);
+    const earliest = later[0];
+    const dayDiff = Math.round((new Date(earliest.day_date + 'T12:00:00') - targetDate) / (24 * 3600 * 1000));
+    const startIdx = NAMES.indexOf(earliest.picker);
+    return NAMES[((startIdx - dayDiff) % NAMES.length + NAMES.length) % NAMES.length];
+  }
+  return NAMES[0];
 }
 
 // ============== Renderers ==============
@@ -908,6 +917,12 @@ function buildNamePicker(isFirstRun) {
       ${isFirstRun ? '' : `<button class="close" data-action="close-name-picker" type="button">Cancel</button>`}
     </div>
   `;
+  if (!isFirstRun) {
+    wrap.addEventListener('click', (ev) => {
+      if (ev.target !== wrap) return; // only react to backdrop clicks, not modal-content clicks
+      closeNamePicker();
+    });
+  }
   return wrap;
 }
 
@@ -1004,6 +1019,11 @@ function buildDaySheet(ymd, existingRow) {
       ${existingRow ? `<button class="danger-btn" data-action="delete-day" data-day-id="${esc(existingRow.id)}" type="button">Delete this day</button>` : ''}
     </div>
   `;
+  wrap.addEventListener('click', (ev) => {
+    if (ev.target !== wrap) return; // only react to backdrop clicks
+    if (isDaySheetDirty() && !confirm('Discard your changes?')) return;
+    closeDayEditor();
+  });
   return wrap;
 }
 
@@ -1083,6 +1103,12 @@ async function togglePersonDone(day_id, name) {
   const existing = state.recentCompletions.find(c => c.day_id === day_id && c.user_name === name);
   const turningOn = !existing;
   if (existing) {
+    if (existing.minutes_spent || existing.note) {
+      const detail = [];
+      if (existing.minutes_spent) detail.push(`${existing.minutes_spent} min`);
+      if (existing.note) detail.push(`"${existing.note}"`);
+      if (!confirm(`Remove ${name}'s entry (${detail.join(' · ')})? It can't be undone.`)) return;
+    }
     const { error } = await sb.from('tt_completion').delete().eq('id', existing.id);
     if (error) { toast('Could not update: ' + error.message); return; }
   } else {
@@ -1202,7 +1228,8 @@ function attachHandlers() {
         const day_id = el.getAttribute('data-day-id');
         const name = el.getAttribute('data-name');
         el.disabled = true;
-        try { await togglePersonDone(day_id, name); } catch (e) { toast(e.message); el.disabled = false; }
+        try { await togglePersonDone(day_id, name); } catch (e) { toast(e.message); }
+        if (document.body.contains(el)) el.disabled = false; // re-enable in case togglePersonDone returned early (cancel)
         return;
       }
     };
