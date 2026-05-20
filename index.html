@@ -293,13 +293,14 @@
     display: flex; flex-direction: column;
     overflow: hidden;
   }
-  .cal-cell.empty { background: transparent; border: none; }
-  .cal-cell.has-day { background: var(--sage-soft); border-color: #cfdcc1; cursor: pointer; }
+  .cal-cell.empty { background: transparent; border: none; cursor: default; }
+  .cal-cell:not(.empty) { cursor: pointer; transition: background 0.1s ease; }
+  .cal-cell:not(.empty):active { background: var(--cream-2); }
+  .cal-cell.has-day { background: var(--sage-soft); border-color: #cfdcc1; }
   .cal-cell.has-day:active { background: #d6e1c7; }
   .cal-cell.today { box-shadow: 0 0 0 2px var(--terracotta); }
-  .cal-cell.future { background: rgba(255, 255, 255, 0.55); border-style: dashed; cursor: pointer; }
-  .cal-cell.future:active { background: var(--cream-2); }
-  .cal-cell.planned { background: var(--terracotta-soft); border-color: #ecc9b9; border-style: solid; cursor: pointer; }
+  .cal-cell.future { background: rgba(255, 255, 255, 0.55); border-style: dashed; }
+  .cal-cell.planned { background: var(--terracotta-soft); border-color: #ecc9b9; border-style: solid; }
   .cal-cell.planned:active { background: #e8c4b3; }
   .cal-cell .num { font-weight: 700; color: var(--ink-soft); font-size: 11px; }
   .cal-cell .area { font-size: 9px; color: var(--ink); line-height: 1.15; margin-top: 2px; word-break: break-word; flex: 1; }
@@ -338,18 +339,18 @@
   .toggle-btn.on { background: var(--sage-deep); border-color: var(--sage-deep); color: #fff; }
   .toggle-btn:disabled { opacity: 0.5; }
 
-  /* ---- Plan day sheet ---- */
-  .plan-day .field { text-align: left; }
-  .plan-day .pred {
+  /* ---- Day sheet (unified past + future editor) ---- */
+  .day-sheet .field { text-align: left; }
+  .day-sheet .pred {
     text-align: center;
     font-size: 13px;
     color: var(--ink-soft);
-    margin-bottom: 14px;
+    margin-bottom: 12px;
   }
-  .plan-day .pred .you { color: var(--sage-deep); font-weight: 700; }
-  .plan-day .pred .other { color: var(--terracotta-deep); font-weight: 600; }
-  .plan-day .btn { margin-top: 4px; }
-  .plan-day .danger-btn {
+  .day-sheet .pred .you { color: var(--sage-deep); font-weight: 700; }
+  .day-sheet .pred .other { color: var(--terracotta-deep); font-weight: 600; }
+  .day-sheet .btn { margin-top: 4px; }
+  .day-sheet .danger-btn {
     display: block;
     margin: 12px auto 0;
     color: var(--terracotta-deep);
@@ -358,6 +359,32 @@
     background: none;
     border: none;
   }
+  .section-label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    font-weight: 700;
+    margin: 14px 0 8px;
+    text-align: left;
+  }
+  .day-sheet .section-label:first-of-type { margin-top: 4px; }
+  .picker-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+  .picker-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ink);
+    text-align: left;
+    transition: background 0.1s ease, border-color 0.1s ease;
+  }
+  .picker-chip .avatar { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 12px; flex-shrink: 0; }
+  .picker-chip.on { border-color: var(--sage); background: var(--sage-soft); box-shadow: 0 0 0 2px rgba(122, 147, 108, 0.18); }
+  .picker-chip:active { background: var(--cream-2); }
 
   /* ---- Misc ---- */
   .empty-state { text-align: center; padding: 30px 20px; color: var(--ink-soft); font-style: italic; }
@@ -403,7 +430,7 @@ let state = {
   recentCompletions: [],         // completions joined for those days
   showNamePicker: false,
   editingDayId: null,            // tt_day.id currently open in the editor sheet
-  planningDate: null,            // 'YYYY-MM-DD' currently open in the plan-day sheet
+  planningDate: null,            // 'YYYY-MM-DD' of the day open in the day sheet
   calYear: null,                  // calendar nav — set lazily on first render
   calMonth: null,                 // 0-indexed month
 };
@@ -781,7 +808,7 @@ function renderHistory() {
         checks += `<span class="check ${isOn ? '' : 'off'} av-${isOn ? name : ''}" title="${esc(name)}">${avatarChar(name)}</span>`;
       }
       html += `
-        <div class="log-row" data-action="edit-day" data-day-id="${esc(d.id)}">
+        <div class="log-row" data-action="open-day" data-ymd="${esc(d.day_date)}" data-day-id="${esc(d.id)}">
           <div class="when">${esc(fmtDayShort(d.day_date))}</div>
           <div class="what">
             <div class="area">${esc(d.area)}</div>
@@ -851,9 +878,8 @@ function renderCalendar() {
     if (dayRow && isFuture) classes.push('planned');
     if (!dayRow && isFuture) classes.push('future');
     if (isToday) classes.push('today');
-    let attrs = '';
-    if (dayRow) attrs = `data-action="edit-day" data-day-id="${esc(dayRow.id)}"`;
-    else if (isFuture) attrs = `data-action="plan-day" data-ymd="${esc(ymd)}"`;
+    let attrs = `data-action="open-day" data-ymd="${esc(ymd)}"`;
+    if (dayRow) attrs += ` data-day-id="${esc(dayRow.id)}"`;
     html += `<div class="cal-cell ${classes.join(' ')}" ${attrs}>${inner}</div>`;
   }
   html += `</div>`;
@@ -887,52 +913,103 @@ function closeNamePicker() {
   state.showNamePicker = false;
 }
 
-// ============== Day editor sheet ==============
-function buildDayEditor(day_id) {
-  const day = state.recentDays.find(d => d.id === day_id);
-  if (!day) return null;
-  const completions = state.recentCompletions.filter(c => c.day_id === day_id);
+// ============== Day sheet (unified past + future editor) ==============
+function buildDaySheet(ymd, existingRow) {
+  const isPast = ymd <= state.todayDate;
+  const compsForDay = existingRow
+    ? state.recentCompletions.filter(c => c.day_id === existingRow.id)
+    : [];
   const compByName = {};
-  for (const c of completions) compByName[c.user_name] = c;
+  for (const c of compsForDay) compByName[c.user_name] = c;
 
-  let rows = '';
-  for (const name of NAMES) {
-    const c = compByName[name];
-    const done = !!c;
-    let meta = '';
-    if (done) {
-      const parts = [];
-      if (c.minutes_spent) parts.push(`${c.minutes_spent} min`);
-      if (c.note) parts.push(esc(c.note));
-      meta = parts.join(' · ');
-    }
-    rows += `
-      <div class="edit-row ${done ? 'done' : ''}">
-        <span class="avatar av-${name}">${avatarChar(name)}</span>
-        <div>
-          <div class="name">${esc(name)}</div>
-          ${meta ? `<div class="meta">${meta}</div>` : ''}
+  const currentPicker = existingRow ? existingRow.picker : predictPicker(ymd);
+
+  let predHtml = '';
+  if (!existingRow) {
+    predHtml = currentPicker === state.who
+      ? `<div class="pred"><span class="you">Predicted: your turn ✓</span> — tap a name to change</div>`
+      : `<div class="pred">Predicted: <span class="other">${esc(currentPicker)}</span> — tap a name to change</div>`;
+  }
+
+  let pickerChips = '';
+  for (const n of NAMES) {
+    pickerChips += `
+      <button class="picker-chip ${currentPicker === n ? 'on' : ''}" data-action="set-day-picker" data-picker-name="${esc(n)}" type="button">
+        <span class="avatar av-${n}">${avatarChar(n)}</span>
+        <span>${esc(n)}</span>
+      </button>
+    `;
+  }
+
+  let toggleSection = '';
+  if (existingRow && isPast) {
+    let toggleRows = '';
+    for (const name of NAMES) {
+      const c = compByName[name];
+      const done = !!c;
+      let meta = '';
+      if (done) {
+        const parts = [];
+        if (c.minutes_spent) parts.push(`${c.minutes_spent} min`);
+        if (c.note) parts.push(esc(c.note));
+        meta = parts.join(' · ');
+      }
+      toggleRows += `
+        <div class="edit-row ${done ? 'done' : ''}">
+          <span class="avatar av-${name}">${avatarChar(name)}</span>
+          <div>
+            <div class="name">${esc(name)}</div>
+            ${meta ? `<div class="meta">${meta}</div>` : ''}
+          </div>
+          <button class="toggle-btn ${done ? 'on' : ''}" data-action="toggle-done" data-day-id="${esc(existingRow.id)}" data-name="${esc(name)}" type="button">
+            ${done ? '✓ Done' : 'Mark done'}
+          </button>
         </div>
-        <button class="toggle-btn ${done ? 'on' : ''}" data-action="toggle-done" data-day-id="${esc(day_id)}" data-name="${esc(name)}" type="button">
-          ${done ? '✓ Done' : 'Mark done'}
-        </button>
-      </div>
+      `;
+    }
+    toggleSection = `
+      <div class="section-label">Completions</div>
+      ${toggleRows}
     `;
   }
 
   const wrap = document.createElement('div');
   wrap.className = 'name-picker-wrap';
   wrap.innerHTML = `
-    <div class="name-picker day-editor">
-      <h2>${esc(fmtDay(day.day_date))}</h2>
-      <div class="area-line">
-        <span class="area-name">${esc(day.area)}</span> · picked by ${esc(day.picker)}
+    <div class="name-picker day-sheet">
+      <h2>${esc(fmtDay(ymd))}</h2>
+      ${predHtml}
+
+      <div class="section-label">Assigned to</div>
+      <div class="picker-chips">${pickerChips}</div>
+
+      <div class="field">
+        <label for="day-area">Area</label>
+        <input id="day-area" type="text" placeholder="e.g. master bathroom, pantry shelves" autocomplete="off" value="${esc(existingRow ? existingRow.area : '')}" />
       </div>
-      ${rows}
-      <button class="close" data-action="close-day-editor" type="button">Done editing</button>
+      <div class="field">
+        <label for="day-note">Note (optional)</label>
+        <textarea id="day-note" placeholder="Anything to call out">${esc(existingRow && existingRow.picker_note ? existingRow.picker_note : '')}</textarea>
+      </div>
+
+      <button class="btn btn-primary" data-action="save-day" data-ymd="${esc(ymd)}" data-day-id="${esc(existingRow ? existingRow.id : '')}" type="button">${existingRow ? 'Save changes' : 'Save'}</button>
+
+      ${toggleSection}
+
+      <button class="close" data-action="close-day-editor" type="button">Cancel</button>
+      ${existingRow ? `<button class="danger-btn" data-action="delete-day" data-day-id="${esc(existingRow.id)}" type="button">Delete this day</button>` : ''}
     </div>
   `;
   return wrap;
+}
+
+function openDaySheet(ymd, existingRow) {
+  state.planningDate = ymd;
+  state.editingDayId = existingRow ? existingRow.id : null;
+  document.querySelectorAll('.name-picker-wrap').forEach(n => n.remove());
+  const sheet = buildDaySheet(ymd, existingRow);
+  document.body.appendChild(sheet);
+  attachHandlers();
 }
 
 function closeDayEditor() {
@@ -941,66 +1018,13 @@ function closeDayEditor() {
   state.planningDate = null;
 }
 
-function reopenDayEditor() {
-  if (!state.editingDayId) return;
-  document.querySelectorAll('.name-picker-wrap').forEach(n => n.remove());
-  const sheet = buildDayEditor(state.editingDayId);
-  if (sheet) {
-    document.body.appendChild(sheet);
-    attachHandlers();
-  }
-}
-
-// ============== Plan day sheet (future-dated entries) ==============
-function buildPlanSheet(ymd, existingRow) {
-  const predicted = predictPicker(ymd);
-  const youArePredicted = predicted === state.who;
-  let predHtml;
-  if (existingRow) {
-    predHtml = `Planned by <span class="${existingRow.picker === state.who ? 'you' : 'other'}">${esc(existingRow.picker)}</span>`;
-  } else if (youArePredicted) {
-    predHtml = `<span class="you">Your turn ✓</span>`;
-  } else {
-    predHtml = `Predicted: <span class="other">${esc(predicted)}</span> — you'll save as <span class="you">${esc(state.who)}</span>`;
-  }
-
-  const wrap = document.createElement('div');
-  wrap.className = 'name-picker-wrap';
-  wrap.innerHTML = `
-    <div class="name-picker plan-day">
-      <h2>${esc(fmtDay(ymd))}</h2>
-      <div class="pred">${predHtml}</div>
-
-      <div class="field">
-        <label for="plan-area">Area</label>
-        <input id="plan-area" type="text" placeholder="e.g. master bathroom, pantry shelves" autocomplete="off" value="${esc(existingRow ? existingRow.area : '')}" />
-      </div>
-      <div class="field">
-        <label for="plan-note">Note (optional)</label>
-        <textarea id="plan-note" placeholder="Anything to call out">${esc(existingRow && existingRow.picker_note ? existingRow.picker_note : '')}</textarea>
-      </div>
-
-      <button class="btn btn-primary" data-action="save-plan" data-ymd="${esc(ymd)}" data-day-id="${esc(existingRow ? existingRow.id : '')}" type="button">${existingRow ? 'Save changes' : 'Save'}</button>
-      <button class="close" data-action="close-day-editor" type="button">Cancel</button>
-      ${existingRow ? `<button class="danger-btn" data-action="delete-day" data-day-id="${esc(existingRow.id)}" type="button">Delete this day</button>` : ''}
-    </div>
-  `;
-  return wrap;
-}
-
-function openPlanSheet(ymd, existingRow) {
-  state.planningDate = ymd;
-  state.editingDayId = existingRow ? existingRow.id : null;
-  const sheet = buildPlanSheet(ymd, existingRow);
-  document.body.appendChild(sheet);
-  attachHandlers();
-}
-
-async function savePlanDay(ymd, dayId, area, note) {
+async function saveDay(ymd, dayId, picker, area, note) {
   if (!area.trim()) { toast('Type an area first'); return; }
+  if (!NAMES.includes(picker)) { toast('Pick who it’s assigned to'); return; }
   const noteClean = note && note.trim() ? note.trim() : null;
   if (dayId) {
     const { error } = await sb.from('tt_day').update({
+      picker,
       area: area.trim(),
       picker_note: noteClean,
     }).eq('id', dayId);
@@ -1009,7 +1033,7 @@ async function savePlanDay(ymd, dayId, area, note) {
     const { error } = await sb.from('tt_day').insert({
       day_date: ymd,
       area: area.trim(),
-      picker: state.who,
+      picker,
       picker_note: noteClean,
     });
     if (error) {
@@ -1020,7 +1044,7 @@ async function savePlanDay(ymd, dayId, area, note) {
   }
   await refresh();
   closeDayEditor();
-  toast(dayId ? 'Updated ✨' : 'Planned ✨');
+  toast(dayId ? 'Updated ✨' : 'Saved ✨');
 }
 
 async function deleteDay(dayId) {
@@ -1035,6 +1059,7 @@ async function deleteDay(dayId) {
 
 async function togglePersonDone(day_id, name) {
   const existing = state.recentCompletions.find(c => c.day_id === day_id && c.user_name === name);
+  const turningOn = !existing;
   if (existing) {
     const { error } = await sb.from('tt_completion').delete().eq('id', existing.id);
     if (error) { toast('Could not update: ' + error.message); return; }
@@ -1044,7 +1069,19 @@ async function togglePersonDone(day_id, name) {
   }
   await Promise.all([loadToday(), loadRecent()]);
   render();
-  reopenDayEditor();
+  // Update toggle button in-place to preserve any in-progress form-field edits in the open sheet
+  const btn = document.querySelector(`.toggle-btn[data-day-id="${day_id}"][data-name="${name}"]`);
+  if (btn) {
+    btn.classList.toggle('on', turningOn);
+    btn.textContent = turningOn ? '✓ Done' : 'Mark done';
+    btn.disabled = false;
+    const row = btn.closest('.edit-row');
+    if (row) {
+      row.classList.toggle('done', turningOn);
+      const meta = row.querySelector('.meta');
+      if (meta) meta.remove();
+    }
+  }
 }
 
 // ============== Handlers ==============
@@ -1093,32 +1130,28 @@ function attachHandlers() {
         try { await refresh(); toast('Refreshed'); } catch (e) { toast(e.message); }
         return;
       }
-      if (action === 'edit-day') {
-        const day_id = el.getAttribute('data-day-id');
-        const day = state.recentDays.find(d => d.id === day_id);
-        if (!day) return;
-        if (day.day_date > state.todayDate) {
-          openPlanSheet(day.day_date, day);
-        } else {
-          state.editingDayId = day_id;
-          const sheet = buildDayEditor(day_id);
-          if (sheet) { document.body.appendChild(sheet); attachHandlers(); }
-        }
-        return;
-      }
-      if (action === 'plan-day') {
-        const ymd = el.getAttribute('data-ymd');
-        openPlanSheet(ymd, null);
-        return;
-      }
-      if (action === 'save-plan') {
+      if (action === 'open-day') {
         const ymd = el.getAttribute('data-ymd');
         const dayId = el.getAttribute('data-day-id') || null;
-        const area = document.getElementById('plan-area').value;
-        const note = document.getElementById('plan-note').value;
+        const row = dayId ? state.recentDays.find(d => d.id === dayId) : null;
+        openDaySheet(ymd, row);
+        return;
+      }
+      if (action === 'set-day-picker') {
+        document.querySelectorAll('.picker-chip').forEach(c => c.classList.remove('on'));
+        el.classList.add('on');
+        return;
+      }
+      if (action === 'save-day') {
+        const ymd = el.getAttribute('data-ymd');
+        const dayId = el.getAttribute('data-day-id') || null;
+        const pickerEl = document.querySelector('.picker-chip.on');
+        const picker = pickerEl ? pickerEl.getAttribute('data-picker-name') : null;
+        const area = document.getElementById('day-area').value;
+        const note = document.getElementById('day-note').value;
         const originalText = el.textContent;
         el.disabled = true; el.textContent = 'Saving…';
-        try { await savePlanDay(ymd, dayId, area, note); } catch (e) { toast(e.message); }
+        try { await saveDay(ymd, dayId, picker, area, note); } catch (e) { toast(e.message); }
         if (document.body.contains(el)) { el.disabled = false; el.textContent = originalText; }
         return;
       }

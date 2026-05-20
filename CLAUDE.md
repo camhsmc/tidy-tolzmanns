@@ -106,13 +106,37 @@ Kara asked for two more things:
 - If days get skipped (no row), predicted picker drifts from actual picker — acceptable hint, not a guarantee
 - Original "next picker = nextPicker(latest row's picker)" semantics in `loadToday` are unchanged
 
+## Session — 2026-05-19 (third pass)
+
+**Unified day sheet + reassignable picker**
+
+Kara surfaced two follow-ups:
+1. The picker (whose turn it is) needs to be editable on any day so they can swap if someone's sick/travelling.
+2. She also wants to backfill calendar days *before* May 18 (when the app was built) — currently those empty past cells aren't tappable.
+
+**Changes**
+- `buildDayEditor` + `buildPlanSheet` collapsed into one `buildDaySheet(ymd, existingRow)`. Sheet now contains:
+  - "Assigned to" section with 4 picker chips (radio-like; tap to select)
+  - Area input + Note textarea
+  - Save button (creates or updates)
+  - For past/today rows: a "Completions" section with the original toggle buttons
+  - Delete button (if row exists)
+- Sheet handles all four cases uniformly: past-empty, past-with-row, today-empty/with-row, future-empty/with-row.
+- All `cal-cell:not(.empty)` are now tappable — past empty cells too, so retroactive backfill works for any historical date.
+- Single `open-day` action replaces `edit-day` + `plan-day`; single `save-day` replaces `save-plan`; new `set-day-picker` toggles the chip selection in-DOM.
+- `togglePersonDone` now updates the toggle button in-place instead of rebuilding the sheet — preserves any in-progress edits to picker/area/note fields while she's marking completions.
+- Picker prediction (`predictPicker`) still shown as a hint for new entries; user can override with any of the 4 chips before saving.
+
+**Bug fix tucked in**
+- `saveDay` now also writes `picker` on update — previously the picker was set at creation and immutable.
+
 ## Open questions / future
 
 - Photos (before/after) — out of scope v1; could add via Supabase Storage later
 - SMS / email nudges — out of scope v1; Gail likely benefits most if added
 - Editable rotation order — hardcoded for v1; settings UI could expose it
 - ~~Editing past entries — not allowed v1~~ ✅ done 2026-05-19
-- Editing area/note of *past* days — not yet; the past-day sheet only toggles completions. Plan-day sheet handles future area edits.
+- ~~Editing area/note/picker on existing days~~ ✅ done 2026-05-19 (third pass)
 
 ## How to run locally
 
