@@ -81,13 +81,38 @@ Stored as Postgres `date`. Single canonical TZ → no per-user drift; not user-v
 - After each toggle: reloads today + recent, re-renders the underlying view, re-opens the sheet with fresh data so minutes/notes reflect current state
 - Anyone can edit anyone's status — no per-row permission. Matches the "trust the family" v1 posture.
 
+## Session — 2026-05-19 (even later)
+
+**Added: calendar navigation + future planning**
+
+Kara asked for two more things:
+1. Be able to navigate to any past month in the calendar to see and edit
+2. Be able to pre-set the area for her next assigned rotation day
+
+**Changes**
+- Calendar header has ‹ / › buttons; `state.calYear` + `state.calMonth` drive which month renders (default = current)
+- `loadRecent()` no longer caps at 35 rows (limit 2000) — all history loaded so any month is browseable without re-fetching
+- Empty future cells: dashed border, tappable → opens **plan-day sheet**
+- Future cells with a row: terracotta-soft "planned" styling, tappable → opens plan-day sheet in edit mode (with Delete this day)
+- Plan-day sheet shows predicted picker (computed via `predictPicker(ymd)` — one rotation step per calendar day from latest prior row) and saves with `picker = state.who`
+- Past cells without rows are NOT tappable (intentional — no retroactive creation; only editing existing days)
+
+**Bug fix tucked in**
+- `loadToday()` now filters `day_date <= todayDate` — otherwise a pre-scheduled future row would be returned as "the latest day" and shadow today's logic
+- `computeStreak` and the "Last 14 days" log filter out future-dated rows so streaks don't reset and the log doesn't surface plans
+
+**predictPicker caveats**
+- Assumes one rotation step per calendar day from the latest existing row's picker
+- If days get skipped (no row), predicted picker drifts from actual picker — acceptable hint, not a guarantee
+- Original "next picker = nextPicker(latest row's picker)" semantics in `loadToday` are unchanged
+
 ## Open questions / future
 
 - Photos (before/after) — out of scope v1; could add via Supabase Storage later
 - SMS / email nudges — out of scope v1; Gail likely benefits most if added
 - Editable rotation order — hardcoded for v1; settings UI could expose it
 - ~~Editing past entries — not allowed v1~~ ✅ done 2026-05-19
-- Editing the picker/area/picker_note of past days — not yet; only completion status is editable
+- Editing area/note of *past* days — not yet; the past-day sheet only toggles completions. Plan-day sheet handles future area edits.
 
 ## How to run locally
 

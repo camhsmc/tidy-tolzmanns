@@ -265,8 +265,20 @@
   .log-row .check.off { background: var(--cream-2); color: var(--ink-soft); border: 1px solid var(--line); }
 
   /* ---- Calendar ---- */
-  .cal-head { display: flex; align-items: baseline; justify-content: space-between; margin: 18px 0 8px; }
-  .cal-head h3 { margin: 0; font-size: 16px; color: var(--sage-deep); }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin: 18px 0 8px; gap: 8px; }
+  .cal-head h3 { margin: 0; font-size: 16px; color: var(--sage-deep); flex: 1; text-align: center; }
+  .cal-nav {
+    width: 36px; height: 36px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 18px;
+    color: var(--sage-deep);
+    font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.1s ease;
+  }
+  .cal-nav:active { background: var(--cream-2); }
   .cal-grid {
     display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
   }
@@ -285,6 +297,10 @@
   .cal-cell.has-day { background: var(--sage-soft); border-color: #cfdcc1; cursor: pointer; }
   .cal-cell.has-day:active { background: #d6e1c7; }
   .cal-cell.today { box-shadow: 0 0 0 2px var(--terracotta); }
+  .cal-cell.future { background: rgba(255, 255, 255, 0.55); border-style: dashed; cursor: pointer; }
+  .cal-cell.future:active { background: var(--cream-2); }
+  .cal-cell.planned { background: var(--terracotta-soft); border-color: #ecc9b9; border-style: solid; cursor: pointer; }
+  .cal-cell.planned:active { background: #e8c4b3; }
   .cal-cell .num { font-weight: 700; color: var(--ink-soft); font-size: 11px; }
   .cal-cell .area { font-size: 9px; color: var(--ink); line-height: 1.15; margin-top: 2px; word-break: break-word; flex: 1; }
   .cal-cell .dots { display: flex; gap: 2px; margin-top: auto; }
@@ -321,6 +337,27 @@
   }
   .toggle-btn.on { background: var(--sage-deep); border-color: var(--sage-deep); color: #fff; }
   .toggle-btn:disabled { opacity: 0.5; }
+
+  /* ---- Plan day sheet ---- */
+  .plan-day .field { text-align: left; }
+  .plan-day .pred {
+    text-align: center;
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-bottom: 14px;
+  }
+  .plan-day .pred .you { color: var(--sage-deep); font-weight: 700; }
+  .plan-day .pred .other { color: var(--terracotta-deep); font-weight: 600; }
+  .plan-day .btn { margin-top: 4px; }
+  .plan-day .danger-btn {
+    display: block;
+    margin: 12px auto 0;
+    color: var(--terracotta-deep);
+    font-size: 13px;
+    font-weight: 600;
+    background: none;
+    border: none;
+  }
 
   /* ---- Misc ---- */
   .empty-state { text-align: center; padding: 30px 20px; color: var(--ink-soft); font-style: italic; }
@@ -366,6 +403,9 @@ let state = {
   recentCompletions: [],         // completions joined for those days
   showNamePicker: false,
   editingDayId: null,            // tt_day.id currently open in the editor sheet
+  planningDate: null,            // 'YYYY-MM-DD' currently open in the plan-day sheet
+  calYear: null,                  // calendar nav — set lazily on first render
+  calMonth: null,                 // 0-indexed month
 };
 
 // ============== Utilities ==============
@@ -405,9 +445,11 @@ function toast(msg) {
 // ============== Data loaders ==============
 async function loadToday() {
   state.todayDate = todayCT();
+  // Filter to rows up to today; pre-scheduled future rows must not shadow today's logic.
   const { data: dayRows, error: e1 } = await sb
     .from('tt_day')
     .select('*')
+    .lte('day_date', state.todayDate)
     .order('day_date', { ascending: false })
     .limit(1);
   if (e1) throw e1;
@@ -428,7 +470,9 @@ async function loadToday() {
   }
 }
 
-async function loadRecent(days = 35) {
+async function loadRecent(days = 2000) {
+  // Loads ALL tt_day rows (limit is just a safety ceiling). The calendar can navigate
+  // to any past or future month, and we want the data already in memory.
   const { data: dayRows, error: e1 } = await sb
     .from('tt_day')
     .select('*')
@@ -513,11 +557,27 @@ function computeStreak(name) {
   }
   let streak = 0;
   for (const day of state.recentDays) {
+    if (day.day_date > state.todayDate) continue; // ignore pre-scheduled future rows
     const set = compsByDay[day.id] || new Set();
     if (set.has(name)) streak++;
     else break;
   }
   return streak;
+}
+
+function predictPicker(ymd) {
+  // Predict whose turn `ymd` falls on, assuming one rotation step per calendar day
+  // forward from the most recent row before `ymd`. Skipped days will shift actuals,
+  // but for a daily-cleaning family this is a useful hint.
+  const prior = state.recentDays.filter(r => r.day_date < ymd);
+  if (prior.length === 0) return NAMES[0];
+  prior.sort((a, b) => a.day_date < b.day_date ? 1 : -1);
+  const latest = prior[0];
+  const latestDate = new Date(latest.day_date + 'T12:00:00');
+  const targetDate = new Date(ymd + 'T12:00:00');
+  const dayDiff = Math.round((targetDate - latestDate) / (24 * 3600 * 1000));
+  const startIdx = NAMES.indexOf(latest.picker);
+  return NAMES[(startIdx + dayDiff) % NAMES.length];
 }
 
 // ============== Renderers ==============
@@ -704,7 +764,7 @@ function renderHistory() {
   // Last 14 days log
   html += `<div class="card" style="padding: 12px 14px;">
     <div class="label" style="margin-bottom: 8px;">Last 14 days</div>`;
-  const recent14 = state.recentDays.slice(0, 14);
+  const recent14 = state.recentDays.filter(d => d.day_date <= state.todayDate).slice(0, 14);
   if (recent14.length === 0) {
     html += `<div class="empty-state" style="padding: 14px;">No history yet. Pick today's area to get started.</div>`;
   } else {
@@ -741,10 +801,14 @@ function renderHistory() {
 }
 
 function renderCalendar() {
-  const today = new Date(state.todayDate + 'T12:00:00');
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  const monthName = today.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  if (state.calYear == null) {
+    const tdy = new Date(state.todayDate + 'T12:00:00');
+    state.calYear = tdy.getFullYear();
+    state.calMonth = tdy.getMonth();
+  }
+  const year = state.calYear;
+  const month = state.calMonth;
+  const monthName = new Date(year, month, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   const first = new Date(year, month, 1);
   const startDow = first.getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -758,7 +822,11 @@ function renderCalendar() {
   }
 
   let html = `
-    <div class="cal-head"><h3>${esc(monthName)}</h3></div>
+    <div class="cal-head">
+      <button class="cal-nav" data-action="cal-prev" type="button" aria-label="Previous month">‹</button>
+      <h3>${esc(monthName)}</h3>
+      <button class="cal-nav" data-action="cal-next" type="button" aria-label="Next month">›</button>
+    </div>
     <div class="cal-grid">
       ${['S','M','T','W','T','F','S'].map(x => `<div class="cal-dow">${x}</div>`).join('')}
   `;
@@ -767,18 +835,26 @@ function renderCalendar() {
     const ymd = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const dayRow = byDate[ymd];
     const isToday = ymd === state.todayDate;
+    const isFuture = ymd > state.todayDate;
     let inner = `<div class="num">${d}</div>`;
     if (dayRow) {
       const done = compsByDay[dayRow.id] || new Set();
       inner += `<div class="area">${esc(dayRow.area.slice(0, 14))}</div>`;
-      let dots = '';
-      for (const name of NAMES) {
-        dots += `<span class="dot ${done.has(name) ? 'on' : ''}"></span>`;
+      if (!isFuture) {
+        let dots = '';
+        for (const name of NAMES) dots += `<span class="dot ${done.has(name) ? 'on' : ''}"></span>`;
+        inner += `<div class="dots">${dots}</div>`;
       }
-      inner += `<div class="dots">${dots}</div>`;
     }
-    const attrs = dayRow ? `data-action="edit-day" data-day-id="${esc(dayRow.id)}"` : '';
-    html += `<div class="cal-cell ${dayRow ? 'has-day' : ''} ${isToday ? 'today' : ''}" ${attrs}>${inner}</div>`;
+    const classes = [];
+    if (dayRow && !isFuture) classes.push('has-day');
+    if (dayRow && isFuture) classes.push('planned');
+    if (!dayRow && isFuture) classes.push('future');
+    if (isToday) classes.push('today');
+    let attrs = '';
+    if (dayRow) attrs = `data-action="edit-day" data-day-id="${esc(dayRow.id)}"`;
+    else if (isFuture) attrs = `data-action="plan-day" data-ymd="${esc(ymd)}"`;
+    html += `<div class="cal-cell ${classes.join(' ')}" ${attrs}>${inner}</div>`;
   }
   html += `</div>`;
   return html;
@@ -862,6 +938,7 @@ function buildDayEditor(day_id) {
 function closeDayEditor() {
   document.querySelectorAll('.name-picker-wrap').forEach(n => n.remove());
   state.editingDayId = null;
+  state.planningDate = null;
 }
 
 function reopenDayEditor() {
@@ -872,6 +949,88 @@ function reopenDayEditor() {
     document.body.appendChild(sheet);
     attachHandlers();
   }
+}
+
+// ============== Plan day sheet (future-dated entries) ==============
+function buildPlanSheet(ymd, existingRow) {
+  const predicted = predictPicker(ymd);
+  const youArePredicted = predicted === state.who;
+  let predHtml;
+  if (existingRow) {
+    predHtml = `Planned by <span class="${existingRow.picker === state.who ? 'you' : 'other'}">${esc(existingRow.picker)}</span>`;
+  } else if (youArePredicted) {
+    predHtml = `<span class="you">Your turn ✓</span>`;
+  } else {
+    predHtml = `Predicted: <span class="other">${esc(predicted)}</span> — you'll save as <span class="you">${esc(state.who)}</span>`;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'name-picker-wrap';
+  wrap.innerHTML = `
+    <div class="name-picker plan-day">
+      <h2>${esc(fmtDay(ymd))}</h2>
+      <div class="pred">${predHtml}</div>
+
+      <div class="field">
+        <label for="plan-area">Area</label>
+        <input id="plan-area" type="text" placeholder="e.g. master bathroom, pantry shelves" autocomplete="off" value="${esc(existingRow ? existingRow.area : '')}" />
+      </div>
+      <div class="field">
+        <label for="plan-note">Note (optional)</label>
+        <textarea id="plan-note" placeholder="Anything to call out">${esc(existingRow && existingRow.picker_note ? existingRow.picker_note : '')}</textarea>
+      </div>
+
+      <button class="btn btn-primary" data-action="save-plan" data-ymd="${esc(ymd)}" data-day-id="${esc(existingRow ? existingRow.id : '')}" type="button">${existingRow ? 'Save changes' : 'Save'}</button>
+      <button class="close" data-action="close-day-editor" type="button">Cancel</button>
+      ${existingRow ? `<button class="danger-btn" data-action="delete-day" data-day-id="${esc(existingRow.id)}" type="button">Delete this day</button>` : ''}
+    </div>
+  `;
+  return wrap;
+}
+
+function openPlanSheet(ymd, existingRow) {
+  state.planningDate = ymd;
+  state.editingDayId = existingRow ? existingRow.id : null;
+  const sheet = buildPlanSheet(ymd, existingRow);
+  document.body.appendChild(sheet);
+  attachHandlers();
+}
+
+async function savePlanDay(ymd, dayId, area, note) {
+  if (!area.trim()) { toast('Type an area first'); return; }
+  const noteClean = note && note.trim() ? note.trim() : null;
+  if (dayId) {
+    const { error } = await sb.from('tt_day').update({
+      area: area.trim(),
+      picker_note: noteClean,
+    }).eq('id', dayId);
+    if (error) { toast('Could not save: ' + error.message); return; }
+  } else {
+    const { error } = await sb.from('tt_day').insert({
+      day_date: ymd,
+      area: area.trim(),
+      picker: state.who,
+      picker_note: noteClean,
+    });
+    if (error) {
+      if (error.code === '23505') toast('Someone just claimed this day!');
+      else toast('Could not save: ' + error.message);
+      return;
+    }
+  }
+  await refresh();
+  closeDayEditor();
+  toast(dayId ? 'Updated ✨' : 'Planned ✨');
+}
+
+async function deleteDay(dayId) {
+  if (!confirm('Delete this day? Any completions logged for it will also be removed.')) return;
+  await sb.from('tt_completion').delete().eq('day_id', dayId);
+  const { error } = await sb.from('tt_day').delete().eq('id', dayId);
+  if (error) { toast('Could not delete: ' + error.message); return; }
+  await refresh();
+  closeDayEditor();
+  toast('Deleted');
 }
 
 async function togglePersonDone(day_id, name) {
@@ -936,9 +1095,47 @@ function attachHandlers() {
       }
       if (action === 'edit-day') {
         const day_id = el.getAttribute('data-day-id');
-        state.editingDayId = day_id;
-        const sheet = buildDayEditor(day_id);
-        if (sheet) { document.body.appendChild(sheet); attachHandlers(); }
+        const day = state.recentDays.find(d => d.id === day_id);
+        if (!day) return;
+        if (day.day_date > state.todayDate) {
+          openPlanSheet(day.day_date, day);
+        } else {
+          state.editingDayId = day_id;
+          const sheet = buildDayEditor(day_id);
+          if (sheet) { document.body.appendChild(sheet); attachHandlers(); }
+        }
+        return;
+      }
+      if (action === 'plan-day') {
+        const ymd = el.getAttribute('data-ymd');
+        openPlanSheet(ymd, null);
+        return;
+      }
+      if (action === 'save-plan') {
+        const ymd = el.getAttribute('data-ymd');
+        const dayId = el.getAttribute('data-day-id') || null;
+        const area = document.getElementById('plan-area').value;
+        const note = document.getElementById('plan-note').value;
+        const originalText = el.textContent;
+        el.disabled = true; el.textContent = 'Saving…';
+        try { await savePlanDay(ymd, dayId, area, note); } catch (e) { toast(e.message); }
+        if (document.body.contains(el)) { el.disabled = false; el.textContent = originalText; }
+        return;
+      }
+      if (action === 'delete-day') {
+        const dayId = el.getAttribute('data-day-id');
+        try { await deleteDay(dayId); } catch (e) { toast(e.message); }
+        return;
+      }
+      if (action === 'cal-prev' || action === 'cal-next') {
+        const delta = action === 'cal-prev' ? -1 : 1;
+        let m = state.calMonth + delta;
+        let y = state.calYear;
+        if (m < 0) { m = 11; y -= 1; }
+        else if (m > 11) { m = 0; y += 1; }
+        state.calMonth = m;
+        state.calYear = y;
+        render();
         return;
       }
       if (action === 'close-day-editor') { closeDayEditor(); return; }
