@@ -588,8 +588,15 @@ function computeStreak(name) {
   for (const day of state.recentDays) {
     if (day.day_date > state.todayDate) continue; // ignore pre-scheduled future rows
     const set = compsByDay[day.id] || new Set();
-    if (set.has(name)) streak++;
-    else break;
+    if (set.has(name)) {
+      streak++;
+    } else if (day.day_date === state.todayDate) {
+      // Today's not over — don't reset the streak just because she hasn't logged yet.
+      // It only counts as a miss once the day rolls past.
+      continue;
+    } else {
+      break;
+    }
   }
   return streak;
 }

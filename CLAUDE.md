@@ -147,6 +147,11 @@ Kara reported the app feeling glitchy. Did a careful code audit + listed 12 find
 - `confirm()` native dialog is jarring vs the warm UI
 - Accidental double-tap on calendar cells; no `user-scalable=no` in viewport (mobile zoom risk)
 
+## Session — 2026-05-20 (QA pass 3)
+
+**Fixed**
+- **Streak no longer drops to 0 mid-day before she's logged today.** `computeStreak` used to break as soon as it saw a `tt_day` row for today without a completion for `name`. Now: if the missing day *is* today, we `continue` instead of `break` — so yesterday and prior keep counting. Once the day rolls over and today becomes yesterday, the normal miss-breaks-streak rule kicks in.
+
 ## Session — 2026-05-20 (QA pass 2)
 
 Next 3 priorities:
