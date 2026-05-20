@@ -71,12 +71,23 @@ Stored as Postgres `date`. Single canonical TZ → no per-user drift; not user-v
 ⏳ First real use — Kara picks today's area as the rotation starter
 ⏳ Share URL with Rachel, Ashley, Gail
 
+## Session — 2026-05-19 (later)
+
+**Added: editable history**
+- Kara asked for the ability to fix past days (e.g. forgot to mark herself done yesterday)
+- Log rows in History tab + has-day calendar cells are now tappable
+- Tap opens a sheet (reuses `.name-picker-wrap` overlay) showing date + area + picker, with a row per person
+- Toggle button per person: insert/delete `tt_completion` row (no `(day_id, user_name)` uniqueness conflict because we delete the existing row before re-inserting)
+- After each toggle: reloads today + recent, re-renders the underlying view, re-opens the sheet with fresh data so minutes/notes reflect current state
+- Anyone can edit anyone's status — no per-row permission. Matches the "trust the family" v1 posture.
+
 ## Open questions / future
 
 - Photos (before/after) — out of scope v1; could add via Supabase Storage later
 - SMS / email nudges — out of scope v1; Gail likely benefits most if added
 - Editable rotation order — hardcoded for v1; settings UI could expose it
-- Editing past entries — not allowed v1; can add an "edit" affordance if requested
+- ~~Editing past entries — not allowed v1~~ ✅ done 2026-05-19
+- Editing the picker/area/picker_note of past days — not yet; only completion status is editable
 
 ## How to run locally
 

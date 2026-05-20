@@ -253,7 +253,10 @@
     border: 1px solid var(--line);
     border-radius: 10px;
     margin-bottom: 6px;
+    cursor: pointer;
+    transition: background 0.1s ease;
   }
+  .log-row:active { background: var(--cream-2); }
   .log-row .when { font-size: 11px; color: var(--ink-soft); }
   .log-row .what .area { font-size: 14px; font-weight: 600; color: var(--ink); }
   .log-row .what .picker { font-size: 11px; color: var(--ink-soft); }
@@ -279,13 +282,45 @@
     overflow: hidden;
   }
   .cal-cell.empty { background: transparent; border: none; }
-  .cal-cell.has-day { background: var(--sage-soft); border-color: #cfdcc1; }
+  .cal-cell.has-day { background: var(--sage-soft); border-color: #cfdcc1; cursor: pointer; }
+  .cal-cell.has-day:active { background: #d6e1c7; }
   .cal-cell.today { box-shadow: 0 0 0 2px var(--terracotta); }
   .cal-cell .num { font-weight: 700; color: var(--ink-soft); font-size: 11px; }
   .cal-cell .area { font-size: 9px; color: var(--ink); line-height: 1.15; margin-top: 2px; word-break: break-word; flex: 1; }
   .cal-cell .dots { display: flex; gap: 2px; margin-top: auto; }
   .cal-cell .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cream-2); }
   .cal-cell .dot.on { background: var(--sage-deep); }
+
+  /* ---- Day editor sheet ---- */
+  .day-editor .area-line { font-size: 13px; color: var(--ink-soft); margin-bottom: 14px; text-align: center; }
+  .day-editor .area-line .area-name { color: var(--ink); font-weight: 600; }
+  .edit-row {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 8px;
+  }
+  .edit-row.done { background: var(--sage-soft); border-color: #cfdcc1; }
+  .edit-row .avatar { width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 15px; }
+  .edit-row .name { font-weight: 600; font-size: 15px; }
+  .edit-row .meta { font-size: 11px; color: var(--ink-soft); margin-top: 1px; }
+  .toggle-btn {
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 13px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink-soft);
+    min-width: 92px;
+  }
+  .toggle-btn.on { background: var(--sage-deep); border-color: var(--sage-deep); color: #fff; }
+  .toggle-btn:disabled { opacity: 0.5; }
 
   /* ---- Misc ---- */
   .empty-state { text-align: center; padding: 30px 20px; color: var(--ink-soft); font-style: italic; }
@@ -330,6 +365,7 @@ let state = {
   recentDays: [],                // last ~30 tt_day rows desc
   recentCompletions: [],         // completions joined for those days
   showNamePicker: false,
+  editingDayId: null,            // tt_day.id currently open in the editor sheet
 };
 
 // ============== Utilities ==============
@@ -685,7 +721,7 @@ function renderHistory() {
         checks += `<span class="check ${isOn ? '' : 'off'} av-${isOn ? name : ''}" title="${esc(name)}">${avatarChar(name)}</span>`;
       }
       html += `
-        <div class="log-row">
+        <div class="log-row" data-action="edit-day" data-day-id="${esc(d.id)}">
           <div class="when">${esc(fmtDayShort(d.day_date))}</div>
           <div class="what">
             <div class="area">${esc(d.area)}</div>
@@ -741,7 +777,8 @@ function renderCalendar() {
       }
       inner += `<div class="dots">${dots}</div>`;
     }
-    html += `<div class="cal-cell ${dayRow ? 'has-day' : ''} ${isToday ? 'today' : ''}">${inner}</div>`;
+    const attrs = dayRow ? `data-action="edit-day" data-day-id="${esc(dayRow.id)}"` : '';
+    html += `<div class="cal-cell ${dayRow ? 'has-day' : ''} ${isToday ? 'today' : ''}" ${attrs}>${inner}</div>`;
   }
   html += `</div>`;
   return html;
@@ -772,6 +809,83 @@ function buildNamePicker(isFirstRun) {
 function closeNamePicker() {
   document.querySelectorAll('.name-picker-wrap').forEach(n => n.remove());
   state.showNamePicker = false;
+}
+
+// ============== Day editor sheet ==============
+function buildDayEditor(day_id) {
+  const day = state.recentDays.find(d => d.id === day_id);
+  if (!day) return null;
+  const completions = state.recentCompletions.filter(c => c.day_id === day_id);
+  const compByName = {};
+  for (const c of completions) compByName[c.user_name] = c;
+
+  let rows = '';
+  for (const name of NAMES) {
+    const c = compByName[name];
+    const done = !!c;
+    let meta = '';
+    if (done) {
+      const parts = [];
+      if (c.minutes_spent) parts.push(`${c.minutes_spent} min`);
+      if (c.note) parts.push(esc(c.note));
+      meta = parts.join(' · ');
+    }
+    rows += `
+      <div class="edit-row ${done ? 'done' : ''}">
+        <span class="avatar av-${name}">${avatarChar(name)}</span>
+        <div>
+          <div class="name">${esc(name)}</div>
+          ${meta ? `<div class="meta">${meta}</div>` : ''}
+        </div>
+        <button class="toggle-btn ${done ? 'on' : ''}" data-action="toggle-done" data-day-id="${esc(day_id)}" data-name="${esc(name)}" type="button">
+          ${done ? '✓ Done' : 'Mark done'}
+        </button>
+      </div>
+    `;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'name-picker-wrap';
+  wrap.innerHTML = `
+    <div class="name-picker day-editor">
+      <h2>${esc(fmtDay(day.day_date))}</h2>
+      <div class="area-line">
+        <span class="area-name">${esc(day.area)}</span> · picked by ${esc(day.picker)}
+      </div>
+      ${rows}
+      <button class="close" data-action="close-day-editor" type="button">Done editing</button>
+    </div>
+  `;
+  return wrap;
+}
+
+function closeDayEditor() {
+  document.querySelectorAll('.name-picker-wrap').forEach(n => n.remove());
+  state.editingDayId = null;
+}
+
+function reopenDayEditor() {
+  if (!state.editingDayId) return;
+  document.querySelectorAll('.name-picker-wrap').forEach(n => n.remove());
+  const sheet = buildDayEditor(state.editingDayId);
+  if (sheet) {
+    document.body.appendChild(sheet);
+    attachHandlers();
+  }
+}
+
+async function togglePersonDone(day_id, name) {
+  const existing = state.recentCompletions.find(c => c.day_id === day_id && c.user_name === name);
+  if (existing) {
+    const { error } = await sb.from('tt_completion').delete().eq('id', existing.id);
+    if (error) { toast('Could not update: ' + error.message); return; }
+  } else {
+    const { error } = await sb.from('tt_completion').insert({ day_id, user_name: name });
+    if (error && error.code !== '23505') { toast('Could not update: ' + error.message); return; }
+  }
+  await Promise.all([loadToday(), loadRecent()]);
+  render();
+  reopenDayEditor();
 }
 
 // ============== Handlers ==============
@@ -818,6 +932,21 @@ function attachHandlers() {
       }
       if (action === 'refresh') {
         try { await refresh(); toast('Refreshed'); } catch (e) { toast(e.message); }
+        return;
+      }
+      if (action === 'edit-day') {
+        const day_id = el.getAttribute('data-day-id');
+        state.editingDayId = day_id;
+        const sheet = buildDayEditor(day_id);
+        if (sheet) { document.body.appendChild(sheet); attachHandlers(); }
+        return;
+      }
+      if (action === 'close-day-editor') { closeDayEditor(); return; }
+      if (action === 'toggle-done') {
+        const day_id = el.getAttribute('data-day-id');
+        const name = el.getAttribute('data-name');
+        el.disabled = true;
+        try { await togglePersonDone(day_id, name); } catch (e) { toast(e.message); el.disabled = false; }
         return;
       }
     };
