@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="theme-color" content="#f6efe3" />
+<title>Tidy Tolzmanns</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --cream: #f6efe3;
+    --cream-2: #ece2cf;
+    --ink: #2d2a26;
+    --ink-soft: #6a6258;
+    --sage: #7a936c;
+    --sage-deep: #4f6648;
+    --sage-soft: #e3ead8;
+    --terracotta: #c9694b;
+    --terracotta-deep: #9c4d33;
+    --terracotta-soft: #f3d8cc;
+    --gold: #c9a14b;
+    --line: #d8cdb4;
+    --shadow: 0 4px 14px rgba(60, 50, 30, 0.08);
+    --shadow-lg: 0 10px 28px rgba(60, 50, 30, 0.14);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; min-height: 100vh; }
+  body {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    background: linear-gradient(180deg, var(--cream) 0%, var(--cream-2) 100%);
+    color: var(--ink);
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    min-height: 100vh;
+    line-height: 1.45;
+  }
+  h1, h2, h3, .serif {
+    font-family: 'Fraunces', 'Times New Roman', serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  input, textarea, select {
+    font-family: inherit;
+    font-size: 16px;
+    width: 100%;
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    border-radius: 10px;
+    outline: none;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--sage); box-shadow: 0 0 0 3px rgba(122, 147, 108, 0.18); }
+  textarea { min-height: 64px; resize: vertical; }
+  label { display: block; font-size: 13px; margin-bottom: 6px; color: var(--ink-soft); font-weight: 600; }
+  .field { margin-bottom: 12px; }
+
+  /* ---- App shell ---- */
+  #app { max-width: 560px; margin: 0 auto; padding: 16px 16px 80px; }
+  .loading { text-align: center; padding: 60px 20px; color: var(--ink-soft); font-style: italic; }
+
+  /* ---- Top bar ---- */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .brand { display: flex; align-items: baseline; gap: 8px; }
+  .brand h1 { margin: 0; font-size: 24px; color: var(--sage-deep); }
+  .brand .sub { font-size: 12px; color: var(--ink-soft); }
+  .who-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 10px 6px 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  .who-chip .dot { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
+
+  /* ---- Tabs ---- */
+  .tabs {
+    display: grid; grid-template-columns: 1fr 1fr;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 18px;
+    box-shadow: var(--shadow);
+  }
+  .tab {
+    padding: 10px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink-soft);
+    text-align: center;
+  }
+  .tab.active {
+    background: var(--sage-soft);
+    color: var(--sage-deep);
+  }
+
+  /* ---- Cards ---- */
+  .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .card.feature {
+    background: linear-gradient(160deg, #fffdf7 0%, var(--sage-soft) 100%);
+    border-color: #cfdcc1;
+  }
+  .card.pending {
+    background: linear-gradient(160deg, #fffdf7 0%, var(--terracotta-soft) 100%);
+    border-color: #ecc9b9;
+  }
+  .card .label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; margin-bottom: 6px; }
+  .card h2 { margin: 0 0 4px; font-size: 22px; color: var(--ink); }
+  .card .picked-by { font-size: 13px; color: var(--ink-soft); margin-top: 6px; }
+  .card .note { margin-top: 10px; font-size: 14px; color: var(--ink); font-style: italic; border-left: 3px solid var(--sage); padding-left: 10px; }
+
+  /* ---- Buttons ---- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 12px 18px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 15px;
+    width: 100%;
+    transition: transform 0.06s ease;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--sage); color: #fff; box-shadow: var(--shadow); }
+  .btn-primary:hover { background: var(--sage-deep); }
+  .btn-secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .btn-warm { background: var(--terracotta); color: #fff; }
+  .btn-ghost { background: transparent; color: var(--sage-deep); }
+
+  /* ---- Person row ---- */
+  .people { display: flex; flex-direction: column; gap: 10px; }
+  .person-row {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .person-row.me { border-color: var(--sage); box-shadow: 0 0 0 2px rgba(122,147,108,0.12); }
+  .person-row.done { background: var(--sage-soft); border-color: #cfdcc1; }
+  .person-row .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; color: #fff;
+  }
+  .person-row .name { font-weight: 600; font-size: 15px; }
+  .person-row .meta { font-size: 12px; color: var(--ink-soft); margin-top: 1px; }
+  .person-row .status {
+    font-size: 13px; font-weight: 700;
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .person-row .status.done { background: var(--sage-deep); color: #fff; }
+  .person-row .status.pending { background: var(--cream-2); color: var(--ink-soft); }
+
+  /* ---- Avatar colors per person ---- */
+  .av-Kara    { background: #e0a55b; }
+  .av-Rachel  { background: #7a936c; }
+  .av-Ashley  { background: #6e8aa6; }
+  .av-Gail    { background: #a87a9b; }
+
+  /* ---- Done form ---- */
+  .done-form {
+    background: #fffdf7;
+    border: 1px dashed var(--sage);
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 10px;
+  }
+  .done-form .row { display: grid; grid-template-columns: 1fr 110px; gap: 10px; }
+
+  /* ---- Name picker (first run / switch) ---- */
+  .name-picker-wrap {
+    position: fixed; inset: 0;
+    background: rgba(60, 50, 30, 0.45);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .name-picker {
+    background: var(--cream);
+    border-radius: 18px;
+    padding: 24px 20px;
+    width: 100%; max-width: 420px;
+    box-shadow: var(--shadow-lg);
+  }
+  .name-picker h2 { margin: 0 0 6px; font-size: 22px; color: var(--sage-deep); text-align: center; }
+  .name-picker .sub { font-size: 14px; color: var(--ink-soft); text-align: center; margin-bottom: 18px; }
+  .name-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .name-tile {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 10px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  .name-tile .avatar-big {
+    width: 48px; height: 48px; border-radius: 50%;
+    margin: 0 auto 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 18px;
+  }
+  .name-picker .close {
+    display: block; margin: 14px auto 0;
+    color: var(--ink-soft); font-size: 13px;
+  }
+
+  /* ---- History ---- */
+  .streaks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .streak {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .streak .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 13px; }
+  .streak .n { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; color: var(--sage-deep); line-height: 1; }
+  .streak .lbl { font-size: 11px; color: var(--ink-soft); }
+
+  .log-row {
+    display: grid; grid-template-columns: 60px 1fr auto; gap: 8px; align-items: center;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 6px;
+  }
+  .log-row .when { font-size: 11px; color: var(--ink-soft); }
+  .log-row .what .area { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .log-row .what .picker { font-size: 11px; color: var(--ink-soft); }
+  .log-row .checks { display: flex; gap: 4px; }
+  .log-row .check { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; }
+  .log-row .check.off { background: var(--cream-2); color: var(--ink-soft); border: 1px solid var(--line); }
+
+  /* ---- Calendar ---- */
+  .cal-head { display: flex; align-items: baseline; justify-content: space-between; margin: 18px 0 8px; }
+  .cal-head h3 { margin: 0; font-size: 16px; color: var(--sage-deep); }
+  .cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  }
+  .cal-dow { font-size: 10px; color: var(--ink-soft); text-align: center; font-weight: 600; padding: 4px 0; }
+  .cal-cell {
+    aspect-ratio: 1;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 4px;
+    font-size: 10px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .cal-cell.empty { background: transparent; border: none; }
+  .cal-cell.has-day { background: var(--sage-soft); border-color: #cfdcc1; }
+  .cal-cell.today { box-shadow: 0 0 0 2px var(--terracotta); }
+  .cal-cell .num { font-weight: 700; color: var(--ink-soft); font-size: 11px; }
+  .cal-cell .area { font-size: 9px; color: var(--ink); line-height: 1.15; margin-top: 2px; word-break: break-word; flex: 1; }
+  .cal-cell .dots { display: flex; gap: 2px; margin-top: auto; }
+  .cal-cell .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cream-2); }
+  .cal-cell .dot.on { background: var(--sage-deep); }
+
+  /* ---- Misc ---- */
+  .empty-state { text-align: center; padding: 30px 20px; color: var(--ink-soft); font-style: italic; }
+  .toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: var(--cream);
+    padding: 10px 18px; border-radius: 999px;
+    font-size: 14px; font-weight: 600;
+    z-index: 200;
+    box-shadow: var(--shadow-lg);
+    animation: toastIn 0.2s ease;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  .row-split { display: flex; gap: 8px; }
+  .row-split > * { flex: 1; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="loading">Tidying…</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+// ============== Config ==============
+const SUPABASE_URL = 'https://optzbdbavpnxstpxrpbh.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_OujPUygbQI0CuYbrOub5kg_ExbErjAZ';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const NAMES = ['Kara', 'Rachel', 'Ashley', 'Gail'];
+const WHO_KEY = 'tt.who';
+const DAY_TZ = 'America/Chicago';
+
+// ============== State ==============
+let state = {
+  who: localStorage.getItem(WHO_KEY) || null,
+  view: 'today',                // 'today' | 'history'
+  today: null,                   // { day: tt_day row, completions: [...] }
+  todayDate: null,               // 'YYYY-MM-DD' in CT
+  pendingPicker: null,           // name of who should pick if no row yet
+  recentDays: [],                // last ~30 tt_day rows desc
+  recentCompletions: [],         // completions joined for those days
+  showNamePicker: false,
+};
+
+// ============== Utilities ==============
+function todayCT() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: DAY_TZ }).format(new Date());
+}
+function nextPicker(prev) {
+  if (!prev) return NAMES[0];
+  const i = NAMES.indexOf(prev);
+  return NAMES[(i + 1) % NAMES.length];
+}
+function fmtDay(ymd) {
+  // ymd is 'YYYY-MM-DD'
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+function fmtDayShort(ymd) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function avatarChar(name) { return name[0]; }
+function toast(msg) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2200);
+}
+
+// ============== Data loaders ==============
+async function loadToday() {
+  state.todayDate = todayCT();
+  const { data: dayRows, error: e1 } = await sb
+    .from('tt_day')
+    .select('*')
+    .order('day_date', { ascending: false })
+    .limit(1);
+  if (e1) throw e1;
+
+  const latest = dayRows && dayRows[0];
+
+  if (latest && latest.day_date === state.todayDate) {
+    const { data: comps, error: e2 } = await sb
+      .from('tt_completion')
+      .select('*')
+      .eq('day_id', latest.id);
+    if (e2) throw e2;
+    state.today = { day: latest, completions: comps || [] };
+    state.pendingPicker = null;
+  } else {
+    state.today = null;
+    state.pendingPicker = latest ? nextPicker(latest.picker) : NAMES[0];
+  }
+}
+
+async function loadRecent(days = 35) {
+  const { data: dayRows, error: e1 } = await sb
+    .from('tt_day')
+    .select('*')
+    .order('day_date', { ascending: false })
+    .limit(days);
+  if (e1) throw e1;
+  state.recentDays = dayRows || [];
+
+  if (state.recentDays.length === 0) {
+    state.recentCompletions = [];
+    return;
+  }
+  const ids = state.recentDays.map(d => d.id);
+  const { data: comps, error: e2 } = await sb
+    .from('tt_completion')
+    .select('*')
+    .in('day_id', ids);
+  if (e2) throw e2;
+  state.recentCompletions = comps || [];
+}
+
+// ============== Actions ==============
+async function pickTodayArea(area, pickerNote) {
+  const picker = state.who;
+  const day_date = state.todayDate;
+  const { error } = await sb.from('tt_day').insert({
+    day_date,
+    area: area.trim(),
+    picker,
+    picker_note: pickerNote && pickerNote.trim() ? pickerNote.trim() : null,
+  });
+  if (error) {
+    if (error.code === '23505') {
+      toast('Someone just picked! Reloading…');
+    } else {
+      toast('Could not save: ' + error.message);
+    }
+    await refresh();
+    return;
+  }
+  await refresh();
+  toast('Today’s area set ✨');
+}
+
+async function markDone(note, minutes) {
+  if (!state.today) return;
+  const payload = {
+    day_id: state.today.day.id,
+    user_name: state.who,
+    note: note && note.trim() ? note.trim() : null,
+    minutes_spent: minutes && minutes > 0 ? minutes : null,
+  };
+  const { error } = await sb.from('tt_completion').insert(payload);
+  if (error) {
+    if (error.code === '23505') {
+      toast('Already marked done!');
+    } else {
+      toast('Could not save: ' + error.message);
+    }
+    await refresh();
+    return;
+  }
+  await refresh();
+  toast('Nice work 🧽');
+}
+
+async function refresh() {
+  await Promise.all([loadToday(), loadRecent()]);
+  render();
+}
+
+// ============== Streak calc ==============
+function computeStreak(name) {
+  // Walk recentDays (desc). For each day, check if `name` has a completion.
+  // Streak = count of consecutive days from the most recent day with a completion downward.
+  // If today's row doesn't exist yet but yesterday's does, we start counting at yesterday.
+  if (state.recentDays.length === 0) return 0;
+  const compsByDay = {};
+  for (const c of state.recentCompletions) {
+    if (!compsByDay[c.day_id]) compsByDay[c.day_id] = new Set();
+    compsByDay[c.day_id].add(c.user_name);
+  }
+  let streak = 0;
+  for (const day of state.recentDays) {
+    const set = compsByDay[day.id] || new Set();
+    if (set.has(name)) streak++;
+    else break;
+  }
+  return streak;
+}
+
+// ============== Renderers ==============
+function render() {
+  const app = document.getElementById('app');
+
+  if (!state.who || state.showNamePicker) {
+    app.innerHTML = renderTopbar() + renderTabs() + renderBody();
+    document.body.appendChild(buildNamePicker(!state.who));
+    attachHandlers();
+    return;
+  }
+
+  app.innerHTML = renderTopbar() + renderTabs() + renderBody();
+  attachHandlers();
+}
+
+function renderTopbar() {
+  if (!state.who) {
+    return `
+      <div class="topbar">
+        <div class="brand">
+          <h1>Tidy Tolzmanns</h1>
+        </div>
+      </div>
+    `;
+  }
+  const initial = avatarChar(state.who);
+  return `
+    <div class="topbar">
+      <div class="brand">
+        <h1>Tidy Tolzmanns</h1>
+      </div>
+      <button class="who-chip" data-action="switch-name" type="button">
+        <span class="dot av-${state.who}">${esc(initial)}</span>
+        ${esc(state.who)}
+      </button>
+    </div>
+  `;
+}
+
+function renderTabs() {
+  if (!state.who) return '';
+  return `
+    <div class="tabs">
+      <button class="tab ${state.view === 'today' ? 'active' : ''}" data-action="tab" data-tab="today" type="button">Today</button>
+      <button class="tab ${state.view === 'history' ? 'active' : ''}" data-action="tab" data-tab="history" type="button">History</button>
+    </div>
+  `;
+}
+
+function renderBody() {
+  if (!state.who) {
+    return `<div class="empty-state">Pick your name to get started.</div>`;
+  }
+  return state.view === 'today' ? renderToday() : renderHistory();
+}
+
+function renderToday() {
+  const dateLine = `<div class="card" style="padding: 10px 14px; margin-bottom: 12px; background: transparent; border: none; box-shadow: none;">
+    <span class="label" style="margin: 0;">${esc(fmtDay(state.todayDate))}</span>
+  </div>`;
+
+  if (!state.today) {
+    const picker = state.pendingPicker;
+    const isMe = picker === state.who;
+    if (isMe) {
+      return dateLine + `
+        <div class="card pending">
+          <div class="label">Your turn to pick</div>
+          <h2>What's today's area?</h2>
+          <div class="picked-by">Pick a single area of the house. Everyone will deep-clean theirs.</div>
+          <div style="margin-top: 14px;">
+            <div class="field">
+              <label for="area-input">Area</label>
+              <input id="area-input" type="text" placeholder="e.g. master bathroom, pantry shelves" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="picker-note">Note (optional)</label>
+              <textarea id="picker-note" placeholder="Anything to call out — like 'don't forget the baseboards'"></textarea>
+            </div>
+            <button class="btn btn-primary" data-action="pick" type="button">Set today's area</button>
+          </div>
+        </div>
+      `;
+    } else {
+      return dateLine + `
+        <div class="card pending">
+          <div class="label">Waiting</div>
+          <h2>Waiting on ${esc(picker)} to pick today's area</h2>
+          <div class="picked-by">Once ${esc(picker)} picks, you'll see what to clean.</div>
+          <div style="margin-top: 14px;">
+            <button class="btn btn-secondary" data-action="refresh" type="button">Refresh</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // Today's area is set
+  const { day, completions } = state.today;
+  const compByName = {};
+  for (const c of completions) compByName[c.user_name] = c;
+  const myCompletion = compByName[state.who];
+
+  let html = dateLine + `
+    <div class="card feature">
+      <div class="label">Today's area</div>
+      <h2>${esc(day.area)}</h2>
+      <div class="picked-by">Picked by ${esc(day.picker)}</div>
+      ${day.picker_note ? `<div class="note">${esc(day.picker_note)}</div>` : ''}
+    </div>
+  `;
+
+  html += `<div class="people">`;
+  for (const name of NAMES) {
+    const c = compByName[name];
+    const isMe = name === state.who;
+    const done = !!c;
+    const cls = `person-row${isMe ? ' me' : ''}${done ? ' done' : ''}`;
+    let meta = '';
+    if (done) {
+      const parts = [];
+      if (c.minutes_spent) parts.push(`${c.minutes_spent} min`);
+      if (c.note) parts.push(esc(c.note));
+      meta = parts.join(' · ');
+    } else if (isMe) {
+      meta = `That's you — mark done below`;
+    } else {
+      meta = `Not done yet`;
+    }
+    html += `
+      <div class="${cls}">
+        <span class="avatar av-${name}">${avatarChar(name)}</span>
+        <div>
+          <div class="name">${esc(name)}${isMe ? ' (you)' : ''}</div>
+          <div class="meta">${meta}</div>
+        </div>
+        <span class="status ${done ? 'done' : 'pending'}">${done ? '✓ Done' : '…'}</span>
+      </div>
+    `;
+  }
+  html += `</div>`;
+
+  if (!myCompletion) {
+    html += `
+      <div class="done-form">
+        <div class="label" style="margin-bottom: 10px;">Mark yourself done</div>
+        <div class="field">
+          <label for="done-note">Note (optional)</label>
+          <input id="done-note" type="text" placeholder="e.g. finally tossed expired spices" />
+        </div>
+        <div class="field">
+          <label for="done-mins">Minutes (optional)</label>
+          <input id="done-mins" type="number" min="1" max="600" placeholder="e.g. 25" inputmode="numeric" />
+        </div>
+        <button class="btn btn-primary" data-action="done" type="button">I'm Done ✓</button>
+      </div>
+    `;
+  } else {
+    html += `<div class="empty-state">You're done for today. Nice. 🧽</div>`;
+  }
+
+  return html;
+}
+
+function renderHistory() {
+  // Streaks
+  let html = `<div class="streaks">`;
+  for (const name of NAMES) {
+    const s = computeStreak(name);
+    html += `
+      <div class="streak">
+        <span class="avatar av-${name}">${avatarChar(name)}</span>
+        <div>
+          <div><span class="n">${s}</span> <span class="lbl">day${s===1?'':'s'} streak</span></div>
+          <div class="lbl">${esc(name)}</div>
+        </div>
+      </div>
+    `;
+  }
+  html += `</div>`;
+
+  // Last 14 days log
+  html += `<div class="card" style="padding: 12px 14px;">
+    <div class="label" style="margin-bottom: 8px;">Last 14 days</div>`;
+  const recent14 = state.recentDays.slice(0, 14);
+  if (recent14.length === 0) {
+    html += `<div class="empty-state" style="padding: 14px;">No history yet. Pick today's area to get started.</div>`;
+  } else {
+    const compsByDay = {};
+    for (const c of state.recentCompletions) {
+      if (!compsByDay[c.day_id]) compsByDay[c.day_id] = new Set();
+      compsByDay[c.day_id].add(c.user_name);
+    }
+    for (const d of recent14) {
+      const done = compsByDay[d.id] || new Set();
+      let checks = '';
+      for (const name of NAMES) {
+        const isOn = done.has(name);
+        checks += `<span class="check ${isOn ? '' : 'off'} av-${isOn ? name : ''}" title="${esc(name)}">${avatarChar(name)}</span>`;
+      }
+      html += `
+        <div class="log-row">
+          <div class="when">${esc(fmtDayShort(d.day_date))}</div>
+          <div class="what">
+            <div class="area">${esc(d.area)}</div>
+            <div class="picker">picked by ${esc(d.picker)}</div>
+          </div>
+          <div class="checks">${checks}</div>
+        </div>
+      `;
+    }
+  }
+  html += `</div>`;
+
+  // Calendar (current month)
+  html += renderCalendar();
+
+  return html;
+}
+
+function renderCalendar() {
+  const today = new Date(state.todayDate + 'T12:00:00');
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const monthName = today.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const first = new Date(year, month, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const byDate = {};
+  for (const d of state.recentDays) byDate[d.day_date] = d;
+  const compsByDay = {};
+  for (const c of state.recentCompletions) {
+    if (!compsByDay[c.day_id]) compsByDay[c.day_id] = new Set();
+    compsByDay[c.day_id].add(c.user_name);
+  }
+
+  let html = `
+    <div class="cal-head"><h3>${esc(monthName)}</h3></div>
+    <div class="cal-grid">
+      ${['S','M','T','W','T','F','S'].map(x => `<div class="cal-dow">${x}</div>`).join('')}
+  `;
+  for (let i = 0; i < startDow; i++) html += `<div class="cal-cell empty"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ymd = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayRow = byDate[ymd];
+    const isToday = ymd === state.todayDate;
+    let inner = `<div class="num">${d}</div>`;
+    if (dayRow) {
+      const done = compsByDay[dayRow.id] || new Set();
+      inner += `<div class="area">${esc(dayRow.area.slice(0, 14))}</div>`;
+      let dots = '';
+      for (const name of NAMES) {
+        dots += `<span class="dot ${done.has(name) ? 'on' : ''}"></span>`;
+      }
+      inner += `<div class="dots">${dots}</div>`;
+    }
+    html += `<div class="cal-cell ${dayRow ? 'has-day' : ''} ${isToday ? 'today' : ''}">${inner}</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+// ============== Name picker overlay ==============
+function buildNamePicker(isFirstRun) {
+  const wrap = document.createElement('div');
+  wrap.className = 'name-picker-wrap';
+  wrap.innerHTML = `
+    <div class="name-picker">
+      <h2>${isFirstRun ? 'Welcome!' : 'Switch user'}</h2>
+      <div class="sub">${isFirstRun ? 'Tap your name to get started.' : 'Tap a different name to switch on this device.'}</div>
+      <div class="name-grid">
+        ${NAMES.map(n => `
+          <button class="name-tile" data-action="set-name" data-name="${esc(n)}" type="button">
+            <div class="avatar-big av-${n}">${avatarChar(n)}</div>
+            ${esc(n)}
+          </button>
+        `).join('')}
+      </div>
+      ${isFirstRun ? '' : `<button class="close" data-action="close-name-picker" type="button">Cancel</button>`}
+    </div>
+  `;
+  return wrap;
+}
+
+function closeNamePicker() {
+  document.querySelectorAll('.name-picker-wrap').forEach(n => n.remove());
+  state.showNamePicker = false;
+}
+
+// ============== Handlers ==============
+function attachHandlers() {
+  document.querySelectorAll('[data-action]').forEach(el => {
+    const action = el.getAttribute('data-action');
+    el.onclick = async (ev) => {
+      ev.preventDefault();
+      if (action === 'switch-name') {
+        state.showNamePicker = true;
+        document.body.appendChild(buildNamePicker(false));
+        attachHandlers();
+        return;
+      }
+      if (action === 'close-name-picker') { closeNamePicker(); return; }
+      if (action === 'set-name') {
+        const name = el.getAttribute('data-name');
+        state.who = name;
+        localStorage.setItem(WHO_KEY, name);
+        closeNamePicker();
+        render();
+        return;
+      }
+      if (action === 'tab') {
+        state.view = el.getAttribute('data-tab');
+        render();
+        return;
+      }
+      if (action === 'pick') {
+        const area = document.getElementById('area-input').value;
+        const note = document.getElementById('picker-note').value;
+        if (!area.trim()) { toast('Type an area first'); return; }
+        el.disabled = true; el.textContent = 'Saving…';
+        try { await pickTodayArea(area, note); } catch (e) { toast(e.message); }
+        return;
+      }
+      if (action === 'done') {
+        const note = document.getElementById('done-note').value;
+        const minsRaw = document.getElementById('done-mins').value;
+        const mins = minsRaw ? parseInt(minsRaw, 10) : null;
+        el.disabled = true; el.textContent = 'Saving…';
+        try { await markDone(note, mins); } catch (e) { toast(e.message); }
+        return;
+      }
+      if (action === 'refresh') {
+        try { await refresh(); toast('Refreshed'); } catch (e) { toast(e.message); }
+        return;
+      }
+    };
+  });
+}
+
+// ============== Boot ==============
+(async function boot() {
+  try {
+    await refresh();
+  } catch (e) {
+    document.getElementById('app').innerHTML = `<div class="empty-state">Couldn't reach Supabase: ${esc(e.message)}<br><br><button class="btn btn-secondary" onclick="location.reload()">Retry</button></div>`;
+  }
+})();
+
+// Re-check the day every 5 minutes in case someone leaves the app open across midnight
+setInterval(() => {
+  const newDate = todayCT();
+  if (newDate !== state.todayDate) refresh();
+}, 5 * 60 * 1000);
+</script>
+
+</body>
+</html>
