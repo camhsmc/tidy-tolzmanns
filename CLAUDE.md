@@ -6,7 +6,8 @@ Single-file vanilla-JS Supabase app for Kara, Rachel, Ashley, Gail's daily deep-
 
 - `index.html` — entire app
 - Supabase: **Cerebro** (`optzbdbavpnxstpxrpbh`), tables prefixed `tt_*`
-- Hosted: local for now, then GitHub Pages
+- Repo: https://github.com/camhsmc/tidy-tolzmanns
+- Live: **https://camhsmc.github.io/tidy-tolzmanns/**
 
 ## Data model
 
@@ -44,13 +45,31 @@ Stored as Postgres `date`. Single canonical TZ → no per-user drift; not user-v
   - **History** tab: per-person streak counts, last 14 days log, current-month calendar grid
 - Warm sage / cream / terracotta palette, Fraunces display + Inter sans
 
+## Session — 2026-05-19
+
+**Deployed**
+- `git init -b main`, initial commit `f1711fc`, 4 files / 951 insertions
+- `gh repo create tidy-tolzmanns --public --source=. --remote=origin --push` → https://github.com/camhsmc/tidy-tolzmanns
+- GitHub Pages enabled via `gh api -X POST repos/camhsmc/tidy-tolzmanns/pages -f 'source[branch]=main' -f 'source[path]=/'`
+- Live URL: https://camhsmc.github.io/tidy-tolzmanns/
+
+**Verified**
+- Anon REST POST to `tt_day` returned HTTP 201 — browser writes will work from any device with the public URL
+- Unique constraints reject duplicate `day_date` and duplicate `(day_id, user_name)`
+- Streak math validated against seeded 7-day fake history (Kara 7, Ashley 5, Rachel 4, Gail 3); test rows wiped before deploy
+
+**Sharing notes**
+- iPhone users: open in Safari → Share → Add to Home Screen (works PWA-style with the existing meta tags)
+- Public URL: anyone with the link can read/write — fine for v1, swap to passcode gate (Gringotts pattern) if abuse happens
+
 ## Status
 
 ✅ Schema deployed and verified
 ✅ App built
-⏳ End-to-end smoke test through local server
-⏳ Deploy to GitHub Pages
-⏳ Share URL with Kara, Rachel, Ashley, Gail
+✅ End-to-end smoke test (REST + SQL) passed
+✅ Deployed to GitHub Pages
+⏳ First real use — Kara picks today's area as the rotation starter
+⏳ Share URL with Rachel, Ashley, Gail
 
 ## Open questions / future
 
