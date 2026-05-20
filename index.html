@@ -300,6 +300,7 @@
   .cal-cell.has-day:active { background: #d6e1c7; }
   .cal-cell.today { box-shadow: 0 0 0 2px var(--terracotta); }
   .cal-cell.future { background: rgba(255, 255, 255, 0.55); border-style: dashed; }
+  .cal-cell.past-empty { background: rgba(255, 255, 255, 0.4); border-style: dashed; border-color: var(--cream-2); }
   .cal-cell.planned { background: var(--terracotta-soft); border-color: #ecc9b9; border-style: solid; }
   .cal-cell.planned:active { background: #e8c4b3; }
   .cal-cell .num { font-weight: 700; color: var(--ink-soft); font-size: 11px; }
@@ -431,6 +432,7 @@ let state = {
   showNamePicker: false,
   editingDayId: null,            // tt_day.id currently open in the editor sheet
   planningDate: null,            // 'YYYY-MM-DD' of the day open in the day sheet
+  daySheetInitial: null,         // snapshot of {picker, area, note} when sheet opened — for dirty check on Cancel
   calYear: null,                  // calendar nav — set lazily on first render
   calMonth: null,                 // 0-indexed month
 };
@@ -877,6 +879,7 @@ function renderCalendar() {
     if (dayRow && !isFuture) classes.push('has-day');
     if (dayRow && isFuture) classes.push('planned');
     if (!dayRow && isFuture) classes.push('future');
+    if (!dayRow && !isFuture && !isToday) classes.push('past-empty');
     if (isToday) classes.push('today');
     let attrs = `data-action="open-day" data-ymd="${esc(ymd)}"`;
     if (dayRow) attrs += ` data-day-id="${esc(dayRow.id)}"`;
@@ -926,9 +929,10 @@ function buildDaySheet(ymd, existingRow) {
 
   let predHtml = '';
   if (!existingRow) {
+    const label = ymd < state.todayDate ? 'Suggested' : 'Predicted';
     predHtml = currentPicker === state.who
-      ? `<div class="pred"><span class="you">Predicted: your turn ✓</span> — tap a name to change</div>`
-      : `<div class="pred">Predicted: <span class="other">${esc(currentPicker)}</span> — tap a name to change</div>`;
+      ? `<div class="pred"><span class="you">${label}: your turn ✓</span> — tap a name to change</div>`
+      : `<div class="pred">${label}: <span class="other">${esc(currentPicker)}</span> — tap a name to change</div>`;
   }
 
   let pickerChips = '';
@@ -1006,16 +1010,34 @@ function buildDaySheet(ymd, existingRow) {
 function openDaySheet(ymd, existingRow) {
   state.planningDate = ymd;
   state.editingDayId = existingRow ? existingRow.id : null;
+  state.daySheetInitial = {
+    picker: existingRow ? existingRow.picker : predictPicker(ymd),
+    area: existingRow ? existingRow.area : '',
+    note: existingRow && existingRow.picker_note ? existingRow.picker_note : '',
+  };
   document.querySelectorAll('.name-picker-wrap').forEach(n => n.remove());
   const sheet = buildDaySheet(ymd, existingRow);
   document.body.appendChild(sheet);
   attachHandlers();
 }
 
+function isDaySheetDirty() {
+  if (!state.daySheetInitial) return false;
+  const init = state.daySheetInitial;
+  const pickerEl = document.querySelector('.picker-chip.on');
+  const currentPicker = pickerEl ? pickerEl.getAttribute('data-picker-name') : null;
+  const currentArea = document.getElementById('day-area')?.value ?? '';
+  const currentNote = document.getElementById('day-note')?.value ?? '';
+  return currentPicker !== init.picker
+    || currentArea !== init.area
+    || currentNote !== init.note;
+}
+
 function closeDayEditor() {
   document.querySelectorAll('.name-picker-wrap').forEach(n => n.remove());
   state.editingDayId = null;
   state.planningDate = null;
+  state.daySheetInitial = null;
 }
 
 async function saveDay(ymd, dayId, picker, area, note) {
@@ -1171,7 +1193,11 @@ function attachHandlers() {
         render();
         return;
       }
-      if (action === 'close-day-editor') { closeDayEditor(); return; }
+      if (action === 'close-day-editor') {
+        if (isDaySheetDirty() && !confirm('Discard your changes?')) return;
+        closeDayEditor();
+        return;
+      }
       if (action === 'toggle-done') {
         const day_id = el.getAttribute('data-day-id');
         const name = el.getAttribute('data-name');

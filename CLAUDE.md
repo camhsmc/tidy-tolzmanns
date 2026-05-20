@@ -130,6 +130,25 @@ Kara surfaced two follow-ups:
 **Bug fix tucked in**
 - `saveDay` now also writes `picker` on update — previously the picker was set at creation and immutable.
 
+## Session — 2026-05-20 (QA pass)
+
+Kara reported the app feeling glitchy. Did a careful code audit + listed 12 findings ordered by likelihood of being what she perceived. Took the top 3:
+
+**Fixed**
+- **Past empty cells had no visual hint they're tappable** — added `.cal-cell.past-empty` styling (paler dashed border, paler bg) so they look interactive like future cells do. Empty-padding (`.cal-cell.empty`) and today cells are unchanged.
+- **"Predicted" label is wrong tense for backfilling** — when `ymd < todayDate`, the day-sheet hint now says "Suggested" instead of "Predicted." Today and future days still say "Predicted."
+- **Cancel silently discarded form edits** — `openDaySheet` now snapshots `{picker, area, note}` into `state.daySheetInitial`. Cancel-button handler runs `isDaySheetDirty()` and `confirm('Discard your changes?')` before closing. Save and Delete close without prompting (since intent is explicit).
+
+**Not yet fixed (lower-priority findings from the audit)**
+- `predictPicker` for dates *before* the earliest existing row always returns Kara — should walk backward through the rotation from the earliest known row
+- Toggle-button in-place update always removes `.meta`; re-marking after unmarking loses the original minutes/note (the new completion has none)
+- 5-min midnight refresh doesn't auto-close an open day sheet
+- `loadRecent` issues a long `.in('day_id', ids)` URL after many months of data
+- Today-tab "your turn to pick" form is a parallel flow to the day-sheet for today
+- No backdrop-tap to close the day sheet
+- Streak breaks on legitimately skipped rotation days
+- `confirm()` native dialog is jarring vs the warm UI
+
 ## Open questions / future
 
 - Photos (before/after) — out of scope v1; could add via Supabase Storage later
