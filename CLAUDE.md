@@ -147,6 +147,28 @@ Kara reported the app feeling glitchy. Did a careful code audit + listed 12 find
 - `confirm()` native dialog is jarring vs the warm UI
 - Accidental double-tap on calendar cells; no `user-scalable=no` in viewport (mobile zoom risk)
 
+## Session — 2026-05-20 (celebration + live notifications)
+
+Kara asked for a cowboy-shooting-pistols celebration when she marks a task done. Ashley asked to be notified when someone else finishes — Cam confirmed that should apply to everyone, not just Ashley. Cam also picked "in-app toast now, PWA push later," so PWA push is deferred.
+
+**Added: cowboy celebration overlay**
+- New `celebrate(name)` function. Full-screen sage-cream-terracotta wash; centered scene with 🤠 in the middle, mirrored 🔫🔫 on either side, alternating 💥 bangs, plus 24-piece confetti falling down the viewport.
+- Big serif "Nice job, [Name]!" and italic "You did it!" below the scene.
+- Triggers from the success path of `markDone()` (replaces the old `toast('Nice work 🧽')`).
+- Auto-dismisses after 3.8s; tap anywhere to dismiss early. Closing class adds a fade-out.
+- Backfill toggles (`togglePersonDone`) deliberately do NOT trigger the celebration — that path is an admin override, not "I just did my chore."
+
+**Added: cross-family live notifications**
+- New `notifyPersonDone(name, area)` function. Slides in a top-of-screen banner with the person's avatar (reuses `av-Kara/Rachel/Ashley/Gail` color classes), "[Name] did it! 🤠", and the area name underneath. Stacks if multiple come in. Auto-dismisses after 5s; tap to dismiss.
+- `subscribeLiveUpdates()` opens a single `tt-live` Supabase Realtime channel listening to `postgres_changes` on `tt_completion` and `tt_day`. Any event triggers a debounced 250ms `refresh()` so all four phones stay in sync.
+- INSERT on `tt_completion`: if the row is for **today's** `tt_day` row AND the `user_name` is not the local user, fires `notifyPersonDone`. Backfilled past-day inserts refresh silently — they're admin edits, not "she just did it."
+
+**Migration (Cerebro)**
+- `tidy_tolzmanns_realtime`: `ALTER PUBLICATION supabase_realtime ADD TABLE public.tt_completion, public.tt_day`. Cerebro had no `tt_*` tables in `supabase_realtime` before this — realtime broadcasting wouldn't have worked otherwise.
+
+**Not done (deferred to a future session)**
+- PWA push (real notifications on locked phones) — needs a service worker, a `push_subscriptions` table, an edge function with VAPID keys, and an iOS PWA install flow. Multi-session work; deferred per Cam's "ship the toast today, push later" call.
+
 ## Session — 2026-05-20 (QA pass 3)
 
 **Fixed**

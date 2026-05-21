@@ -401,6 +401,143 @@
   @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
   .row-split { display: flex; gap: 8px; }
   .row-split > * { flex: 1; }
+
+  /* ---- Celebration overlay (cowboy!) ---- */
+  .celebration-overlay {
+    position: fixed; inset: 0;
+    background: radial-gradient(circle at center, rgba(246, 239, 227, 0.96) 0%, rgba(236, 226, 207, 0.94) 60%, rgba(201, 105, 75, 0.32) 100%);
+    z-index: 300;
+    display: flex; align-items: center; justify-content: center;
+    animation: celebFade 0.25s ease;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .celebration-overlay.closing { animation: celebFadeOut 0.35s ease forwards; }
+  @keyframes celebFade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes celebFadeOut { to { opacity: 0; } }
+  .celebration-content {
+    text-align: center;
+    padding: 0 24px;
+    transform: scale(0.7);
+    animation: celebPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  @keyframes celebPop { to { transform: scale(1); } }
+  .cowboy-scene {
+    display: flex; align-items: center; justify-content: center;
+    gap: 4px;
+    font-size: 64px;
+    line-height: 1;
+    margin-bottom: 18px;
+    position: relative;
+  }
+  .cowboy-scene .cowboy {
+    font-size: 96px;
+    animation: cowboyBounce 0.6s ease-in-out infinite alternate;
+    filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.18));
+  }
+  @keyframes cowboyBounce {
+    from { transform: translateY(0) rotate(-3deg); }
+    to { transform: translateY(-8px) rotate(3deg); }
+  }
+  .cowboy-scene .pistol {
+    font-size: 56px;
+    animation: pistolKick 0.32s ease-out infinite;
+  }
+  .cowboy-scene .pistol-left {
+    transform: scaleX(-1);
+    transform-origin: center;
+  }
+  @keyframes pistolKick {
+    0%, 100% { transform: var(--pistol-base, none) translateX(0); }
+    20% { transform: var(--pistol-base, none) translateX(var(--kick, -6px)) rotate(-8deg); }
+    40% { transform: var(--pistol-base, none) translateX(0); }
+  }
+  .cowboy-scene .pistol-left { --pistol-base: scaleX(-1); --kick: -6px; }
+  .cowboy-scene .pistol-right { --kick: 6px; }
+  .cowboy-scene .bang {
+    font-size: 44px;
+    animation: bangFlash 0.32s ease-out infinite;
+    opacity: 0;
+  }
+  @keyframes bangFlash {
+    0%, 100% { opacity: 0; transform: scale(0.6); }
+    20% { opacity: 1; transform: scale(1.2); }
+    40% { opacity: 0.6; transform: scale(1); }
+  }
+  .celebration-text-big {
+    font-family: 'Fraunces', serif;
+    font-size: 38px;
+    font-weight: 700;
+    color: var(--terracotta-deep);
+    line-height: 1.1;
+    margin-bottom: 6px;
+    text-shadow: 0 2px 0 rgba(255, 255, 255, 0.7);
+  }
+  .celebration-text-small {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--sage-deep);
+    font-style: italic;
+  }
+  .confetti {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .confetti-piece {
+    position: absolute;
+    top: -10px;
+    width: 8px; height: 14px;
+    border-radius: 2px;
+    left: calc((var(--i) * 4.3%) + 1%);
+    background: var(--c, var(--terracotta));
+    animation: confettiFall 2.6s linear infinite;
+    animation-delay: calc(var(--i) * -0.13s);
+    opacity: 0.85;
+  }
+  .confetti-piece:nth-child(3n)   { --c: var(--sage); }
+  .confetti-piece:nth-child(3n+1) { --c: var(--terracotta); }
+  .confetti-piece:nth-child(3n+2) { --c: #e6b85c; }
+  @keyframes confettiFall {
+    0%   { transform: translateY(0) rotate(0deg);   opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0.7; }
+  }
+
+  /* ---- Notification banner stack (someone-else-done) ---- */
+  #notify-stack {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 250;
+    display: flex; flex-direction: column; gap: 8px;
+    width: min(92vw, 380px);
+    pointer-events: none;
+  }
+  .notify-banner {
+    pointer-events: auto;
+    background: linear-gradient(160deg, #fffdf7 0%, var(--terracotta-soft) 100%);
+    border: 1px solid var(--terracotta-soft);
+    border-radius: 14px;
+    padding: 10px 14px;
+    box-shadow: var(--shadow-lg);
+    display: flex; align-items: center; gap: 10px;
+    animation: notifySlide 0.3s ease;
+    cursor: pointer;
+  }
+  .notify-banner.closing { animation: notifySlideOut 0.3s ease forwards; }
+  @keyframes notifySlide   { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes notifySlideOut { to { opacity: 0; transform: translateY(-12px); } }
+  .notify-banner .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 15px;
+    flex-shrink: 0;
+  }
+  .notify-banner .msg { flex: 1; min-width: 0; }
+  .notify-banner .msg .top { font-weight: 600; color: var(--ink); font-size: 14px; line-height: 1.2; }
+  .notify-banner .msg .sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+  .notify-banner .emoji { font-size: 22px; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -469,6 +606,64 @@ function toast(msg) {
   t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2200);
+}
+
+// Full-screen cowboy celebration when *you* finish your task.
+function celebrate(name) {
+  document.querySelectorAll('.celebration-overlay').forEach(o => o.remove());
+  const overlay = document.createElement('div');
+  overlay.className = 'celebration-overlay';
+  const confetti = Array.from({ length: 24 }, (_, i) => `<span class="confetti-piece" style="--i:${i}"></span>`).join('');
+  overlay.innerHTML = `
+    <div class="confetti">${confetti}</div>
+    <div class="celebration-content">
+      <div class="cowboy-scene">
+        <span class="bang bang-left">💥</span>
+        <span class="pistol pistol-left">🔫</span>
+        <span class="cowboy">🤠</span>
+        <span class="pistol pistol-right">🔫</span>
+        <span class="bang bang-right">💥</span>
+      </div>
+      <div class="celebration-text-big">Nice job, ${esc(name)}!</div>
+      <div class="celebration-text-small">You did it!</div>
+    </div>
+  `;
+  const close = () => {
+    if (!document.body.contains(overlay)) return;
+    overlay.classList.add('closing');
+    setTimeout(() => overlay.remove(), 350);
+  };
+  overlay.addEventListener('click', close);
+  document.body.appendChild(overlay);
+  setTimeout(close, 3800);
+}
+
+// Notification banner when *someone else* finishes their task.
+function notifyPersonDone(name, area) {
+  let stack = document.getElementById('notify-stack');
+  if (!stack) {
+    stack = document.createElement('div');
+    stack.id = 'notify-stack';
+    document.body.appendChild(stack);
+  }
+  const b = document.createElement('div');
+  b.className = 'notify-banner';
+  b.innerHTML = `
+    <span class="avatar av-${esc(name)}">${esc(avatarChar(name))}</span>
+    <div class="msg">
+      <div class="top">${esc(name)} did it! 🤠</div>
+      <div class="sub">${esc(area || 'Task complete')}</div>
+    </div>
+    <span class="emoji">🎉</span>
+  `;
+  const close = () => {
+    if (!stack.contains(b)) return;
+    b.classList.add('closing');
+    setTimeout(() => { if (stack.contains(b)) stack.removeChild(b); }, 300);
+  };
+  b.addEventListener('click', close);
+  stack.appendChild(b);
+  setTimeout(close, 5000);
 }
 
 // ============== Data loaders ==============
@@ -565,7 +760,7 @@ async function markDone(note, minutes) {
     return;
   }
   await refresh();
-  toast('Nice work 🧽');
+  celebrate(state.who);
 }
 
 async function refresh() {
@@ -1249,8 +1444,36 @@ function attachHandlers() {
     await refresh();
   } catch (e) {
     document.getElementById('app').innerHTML = `<div class="empty-state">Couldn't reach Supabase: ${esc(e.message)}<br><br><button class="btn btn-secondary" onclick="location.reload()">Retry</button></div>`;
+    return;
   }
+  subscribeLiveUpdates();
 })();
+
+// Live updates: refresh on any tt_day / tt_completion change.
+// Show a notification banner when someone *other than you* completes today's task.
+function subscribeLiveUpdates() {
+  let refreshTimer = null;
+  const scheduleRefresh = () => {
+    if (refreshTimer) return;
+    refreshTimer = setTimeout(async () => {
+      refreshTimer = null;
+      try { await refresh(); } catch (e) { /* swallow — next event will retry */ }
+    }, 250);
+  };
+  sb.channel('tt-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tt_completion' }, (payload) => {
+      if (payload.eventType === 'INSERT') {
+        const row = payload.new;
+        // Only notify for someone-else finishing *today's* row (not backfilled past days).
+        const isToday = state.today && row && row.day_id === state.today.day.id;
+        const isMe = row && row.user_name === state.who;
+        if (isToday && !isMe) notifyPersonDone(row.user_name, state.today.day.area);
+      }
+      scheduleRefresh();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tt_day' }, scheduleRefresh)
+    .subscribe();
+}
 
 // Re-check the day every 5 minutes in case someone leaves the app open across midnight
 setInterval(() => {
