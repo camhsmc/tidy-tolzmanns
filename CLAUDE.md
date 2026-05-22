@@ -147,6 +147,23 @@ Kara reported the app feeling glitchy. Did a careful code audit + listed 12 find
 - `confirm()` native dialog is jarring vs the warm UI
 - Accidental double-tap on calendar cells; no `user-scalable=no` in viewport (mobile zoom risk)
 
+## Session — 2026-05-22 (home-screen icon)
+
+Cam asked how iPhone PWA icons work. Test case for the broader pattern: gave Tidy Tolzmanns a distinct home-screen icon (broom emoji on sage green) so it doesn't look like a screenshot of the app.
+
+**Added**
+- `apple-touch-icon.png` (180×180, sage-green `#7a936c`, 🧹 emoji rotated ~12° with drop shadow). Generated via headless Chrome screenshot of `/tmp/tt-icon-gen.html`.
+- Three new lines in `<head>` of `index.html`:
+  - `<meta name="apple-mobile-web-app-title" content="Tidy" />` — short label under the home-screen icon
+  - `<link rel="apple-touch-icon" href="apple-touch-icon.png" />`
+  - `apple-mobile-web-app-capable` was already there from initial build.
+
+**The catch worth remembering**
+- iOS caches the icon at install time. Anyone who already added the app to their home screen has to long-press → Remove Bookmark → re-open in Safari → Share → Add to Home Screen to pick up the new icon. Tell Kara, Rachel, Ashley, Gail when sharing the icon update.
+
+**Pattern for other PWAs**
+- The `/tmp/tt-icon-gen.html` recipe (HTML with solid bg + emoji + headless Chrome screenshot at `--window-size=180,180`) is the cheap reusable path for the other apps: Haines Harvest, Cam's Cave, CamNote, Spelling Practice, Haines Gringotts, Lawn Job Logger, Dagger Electric. Same three head tags, different icon file.
+
 ## Session — 2026-05-20 (celebration + live notifications)
 
 Kara asked for a cowboy-shooting-pistols celebration when she marks a task done. Ashley asked to be notified when someone else finishes — Cam confirmed that should apply to everyone, not just Ashley. Cam also picked "in-app toast now, PWA push later," so PWA push is deferred.
