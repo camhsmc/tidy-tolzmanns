@@ -19,6 +19,15 @@ tt_photo      (id, completion_id fk cascade, path, created_at)   -- up to 4 per 
 
 Photos live in the public Storage bucket `tt-photos` (5 MB cap, image/* only), path `<completion_id>/<ts>-<n>.jpg`. The browser resizes to 1280px JPEG before upload. Deleting a photo removes the storage object then the row. Migration: `tidy_tolzmanns_photos`.
 
+## Push reminders (pick-day nudges)
+
+- `sw.js` — push + notificationclick handlers only, no caching. Registered from `index.html` on boot.
+- "Pick-day reminders" card at the bottom of the Today tab: Turn on → `Notification.requestPermission` → `pushManager.subscribe` (VAPID public key in `index.html`) → upsert `tt_push_sub` keyed by endpoint with `user_name = state.who` and the device timezone. Switching name re-points the row. Turn off deletes the row and unsubscribes.
+- iPhone: only works from the Home Screen install (iOS 16.4+); the card says so when opened in Safari.
+- Edge function `tt-remind` (`supabase/functions/tt-remind/index.ts`, deployed with `--no-verify-jwt`, guarded by `x-webhook-secret` = vault `tt_remind_secret`). pg_cron `tt-remind-hourly` at `2 * * * *`. Each run: today's picker (Central) → if no `tt_day` row yet → for that person's devices, if their **local** hour is 8 or 11 → claim `(day, user, slot)` in `tt_reminder_log` → send. Two consecutive 404/410s drop a device (`fail_count`).
+- Test a phone: `curl -X POST .../functions/v1/tt-remind -H "x-webhook-secret: <vault secret>" -d '{"test":"Kara"}'`.
+- Secrets on the function: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `TT_REMIND_SECRET`. Migrations: `tidy_tolzmanns_push_reminders`, `tidy_tolzmanns_push_fail_count`.
+
 ## Release notes
 
 `RELEASE` constant near the top of the script. Bump `id` when a batch ships; each device shows the list once (`localStorage['tt.seenRelease']`).
@@ -215,7 +224,7 @@ Next 3 priorities:
 ## Open questions / future
 
 - ~~Photos~~ ✅ done 2026-09-19 (tt-photos bucket, tt_photo table, 4 per completion)
-- SMS / email nudges — out of scope v1; Gail likely benefits most if added
+- ~~SMS / email nudges~~ ✅ web push pick-day reminders 2026-09-19 (8am + 11am local)
 - Editable rotation order — hardcoded for v1; settings UI could expose it
 - ~~Editing past entries — not allowed v1~~ ✅ done 2026-05-19
 - ~~Editing area/note/picker on existing days~~ ✅ done 2026-05-19 (third pass)

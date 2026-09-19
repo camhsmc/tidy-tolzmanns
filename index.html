@@ -484,6 +484,14 @@
   .lightbox .sheet-x { position: fixed; top: calc(14px + env(safe-area-inset-top)); right: 14px; }
   .log-row .photos-n { font-size: 11px; color: var(--ink-soft); margin-left: 6px; }
 
+  /* ---- Reminders card ---- */
+  .reminders { display: grid; grid-template-columns: 32px 1fr; gap: 10px; align-items: start; }
+  .reminders .ic { font-size: 22px; line-height: 1.2; }
+  .reminders .t { font-weight: 700; font-size: 15px; }
+  .reminders .d { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+  .reminders .btn { margin-top: 10px; }
+  .reminders .btn-ghost { width: auto; padding: 6px 0; font-size: 13px; }
+
   /* ---- Release notes sheet ---- */
   .release-item { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; margin-bottom: 12px; text-align: left; }
   .release-item .ic { font-size: 22px; line-height: 1.2; text-align: center; }
@@ -661,15 +669,18 @@ const WHO_KEY = 'tt.who';
 const RELEASE_KEY = 'tt.seenRelease';
 // Bump `id` whenever a new batch ships; every device shows the list once on next open.
 const RELEASE = {
-  id: '2026-09-19',
+  id: '2026-09-19b',
   items: [
     ['📋', 'Catch-up list', 'The Today tab now lists every day you\'re behind on, newest first, with a one-tap Done button. Tap a row to open the day instead.'],
     ['📷', 'Photos', 'Add up to 4 photos when you mark yourself done. You can also add them later from your row on the Today tab, or from any past day.'],
     ['✕',  'Easier to close', 'Every pop-up has an X in the corner now, and long ones scroll so the buttons are never stuck off-screen.'],
     ['💬', 'Quote of the day', 'A new thought on cleanliness and order at the top of the Today tab each day, from scripture, Church leaders, and a few others.'],
+    ['🔔', 'Pick-day reminders', 'Turn on reminders at the bottom of the Today tab. On days it\'s your turn to pick, your phone gets a nudge at 8am and again at 11am if the area still isn\'t set.'],
   ],
 };
 const DAY_TZ = 'America/Chicago';
+const VAPID_PUBLIC_KEY = 'BEC7U7djswuWxxykTtVDuXYWBge7xTcdydxrBu60L4i7EKBYbFckKJxsaR_t8JURKuoNldoepUc_wAdRtTdTRis';
+const SW_PATH = 'sw.js';
 
 // ============== Daily quote ==============
 // Scripture, Church leaders, and everyone else, on cleanliness, order, and work.
@@ -752,6 +763,7 @@ let state = {
   recentPhotos: [],              // all tt_photo rows (small table; loaded whole)
   catchupExpanded: false,        // Today tab catch-up list: show all vs first 5
   pendingDonePhotos: [],         // File objects staged in the Mark Done form before upload
+  push: { reg: null, subscribed: false, permission: 'default', ready: false }, // web push state for this device
   showNamePicker: false,
   editingDayId: null,            // tt_day.id currently open in the editor sheet
   planningDate: null,            // 'YYYY-MM-DD' of the day open in the day sheet
@@ -967,6 +979,108 @@ function notifyPersonDone(name, area) {
   b.addEventListener('click', close);
   stack.appendChild(b);
   setTimeout(close, 5000);
+}
+
+// ============== Push reminders ==============
+function pushSupported() {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+function isIosNotStandalone() {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const standalone = window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  return ios && !standalone;
+}
+function urlBase64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+}
+function deviceTz() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || DAY_TZ; } catch (e) { return DAY_TZ; }
+}
+// Registers the service worker and reads this device's current subscription state.
+async function initPush() {
+  if (!('serviceWorker' in navigator)) { state.push.ready = true; return; }
+  try {
+    const reg = await navigator.serviceWorker.register(SW_PATH);
+    state.push.reg = reg;
+    if (pushSupported()) {
+      state.push.permission = Notification.permission;
+      const sub = await reg.pushManager.getSubscription();
+      state.push.subscribed = !!sub;
+      if (sub && state.who) await syncSubRow(sub); // keep name + timezone current for this device
+    }
+  } catch (e) {
+    console.warn('service worker', e);
+  }
+  state.push.ready = true;
+  render();
+}
+// The device row follows whoever is picked on this device.
+async function syncSubRow(sub) {
+  const j = sub.toJSON();
+  const { error } = await sb.from('tt_push_sub').upsert({
+    endpoint: sub.endpoint,
+    p256dh: j.keys.p256dh,
+    auth: j.keys.auth,
+    user_name: state.who,
+    tz: deviceTz(),
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'endpoint' });
+  if (error) throw new Error('Could not save reminder settings: ' + error.message);
+}
+async function enablePush() {
+  const perm = await Notification.requestPermission();
+  state.push.permission = perm;
+  if (perm !== 'granted') { render(); toast('Notifications are blocked for this app'); return; }
+  const reg = state.push.reg || await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) });
+  await syncSubRow(sub);
+  state.push.subscribed = true;
+  render();
+  toast('Reminders on 🔔');
+}
+async function disablePush() {
+  const reg = state.push.reg || await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (sub) {
+    await sb.from('tt_push_sub').delete().eq('endpoint', sub.endpoint);
+    await sub.unsubscribe();
+  }
+  state.push.subscribed = false;
+  render();
+  toast('Reminders off');
+}
+function renderReminders() {
+  const p = state.push;
+  let ic = '🔔', t = 'Pick-day reminders', d = '', action = '';
+  if (p.subscribed) {
+    d = `On. This phone gets a nudge at 8am, and again at 11am if the area still isn't set, on days it's your turn to pick.`;
+    action = `<button class="btn btn-ghost" data-action="push-off" type="button">Turn off</button>`;
+  } else if (isIosNotStandalone()) {
+    d = `To get reminders on iPhone, add this app to your Home Screen first (Share → Add to Home Screen), then open it from there and tap Turn on.`;
+  } else if (!pushSupported()) {
+    d = `This browser can't show reminders.`;
+  } else if (p.permission === 'denied') {
+    d = `Notifications are blocked for this app in your phone's settings. Allow them there, then come back.`;
+  } else if (!p.ready) {
+    d = `Checking…`;
+  } else {
+    d = `Get a nudge at 8am on days it's your turn to pick, and again at 11am if the area still isn't set.`;
+    action = `<button class="btn btn-primary" data-action="push-on" type="button">Turn on reminders</button>`;
+  }
+  return `
+    <div class="card" style="margin-top: 14px;">
+      <div class="reminders">
+        <div class="ic">${ic}</div>
+        <div>
+          <div class="t">${t}</div>
+          <div class="d">${d}</div>
+          ${action}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 // ============== Data loaders ==============
@@ -1264,7 +1378,7 @@ function renderToday() {
             <button class="btn btn-primary" data-action="pick" type="button">Set today's area</button>
           </div>
         </div>
-      ` + renderCatchup();
+      ` + renderCatchup() + renderReminders();
     } else {
       return dateLine + `
         <div class="card pending">
@@ -1275,7 +1389,7 @@ function renderToday() {
             <button class="btn btn-secondary" data-action="refresh" type="button">Refresh</button>
           </div>
         </div>
-      ` + renderCatchup();
+      ` + renderCatchup() + renderReminders();
     }
   }
 
@@ -1356,6 +1470,7 @@ function renderToday() {
   }
 
   html += renderCatchup();
+  html += renderReminders();
   return html;
 }
 
@@ -1736,6 +1851,10 @@ function attachHandlers() {
         localStorage.setItem(WHO_KEY, name);
         closeNamePicker();
         render();
+        if (state.push.subscribed && state.push.reg) {
+          try { const sub = await state.push.reg.pushManager.getSubscription(); if (sub) await syncSubRow(sub); }
+          catch (e) { toast(e.message); }
+        }
         return;
       }
       if (action === 'tab') {
@@ -1807,6 +1926,16 @@ function attachHandlers() {
       if (action === 'close-day-editor') {
         if (isDaySheetDirty() && !confirm('Discard your changes?')) return;
         closeDayEditor();
+        return;
+      }
+      if (action === 'push-on') {
+        el.disabled = true; el.textContent = 'Turning on…';
+        try { await enablePush(); } catch (e) { toast(e.message); render(); }
+        return;
+      }
+      if (action === 'push-off') {
+        el.disabled = true;
+        try { await disablePush(); } catch (e) { toast(e.message); render(); }
         return;
       }
       if (action === 'catchup-done') {
@@ -1914,6 +2043,7 @@ function maybeShowReleaseNotes() {
     return;
   }
   subscribeLiveUpdates();
+  initPush();
   // Returning users see the release list once; first-run users are busy picking a name.
   if (state.who) maybeShowReleaseNotes();
 })();
