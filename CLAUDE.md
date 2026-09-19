@@ -14,7 +14,18 @@ Single-file vanilla-JS Supabase app for Kara, Rachel, Ashley, Gail's daily deep-
 ```sql
 tt_day        (id, day_date unique, area, picker, picker_note, picked_at)
 tt_completion (id, day_id fk, user_name, minutes_spent, note, completed_at, unique(day_id, user_name))
+tt_photo      (id, completion_id fk cascade, path, created_at)   -- up to 4 per completion, enforced app-side
 ```
+
+Photos live in the public Storage bucket `tt-photos` (5 MB cap, image/* only), path `<completion_id>/<ts>-<n>.jpg`. The browser resizes to 1280px JPEG before upload. Deleting a photo removes the storage object then the row. Migration: `tidy_tolzmanns_photos`.
+
+## Release notes
+
+`RELEASE` constant near the top of the script. Bump `id` when a batch ships; each device shows the list once (`localStorage['tt.seenRelease']`).
+
+## Daily quote
+
+`QUOTES` array (scripture, Church leaders, others). Index = days-since-epoch mod length, so every phone shows the same quote on a given day. Add to the end of the array to avoid reshuffling.
 
 `picker` and `user_name` are CHECK-constrained to one of: Kara, Rachel, Ashley, Gail.
 
@@ -141,6 +152,7 @@ Kara reported the app feeling glitchy. Did a careful code audit + listed 12 find
 
 **Not yet fixed (lower-priority findings from the audit)**
 - 5-min midnight refresh doesn't auto-close an open day sheet
+- ~~Day sheet taller than the viewport had no scroll — Cancel was unreachable on phones~~ ✅ fixed 2026-09-19 (overflow-y on the wrap + X button)
 - `loadRecent` issues a long `.in('day_id', ids)` URL after many months of data
 - Today-tab "your turn to pick" form is a parallel flow to the day-sheet for today
 - Streak breaks on legitimately skipped rotation days
@@ -202,7 +214,7 @@ Next 3 priorities:
 
 ## Open questions / future
 
-- Photos (before/after) — out of scope v1; could add via Supabase Storage later
+- ~~Photos~~ ✅ done 2026-09-19 (tt-photos bucket, tt_photo table, 4 per completion)
 - SMS / email nudges — out of scope v1; Gail likely benefits most if added
 - Editable rotation order — hardcoded for v1; settings UI could expose it
 - ~~Editing past entries — not allowed v1~~ ✅ done 2026-05-19

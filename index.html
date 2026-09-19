@@ -198,8 +198,10 @@
     background: rgba(60, 50, 30, 0.45);
     backdrop-filter: blur(4px);
     z-index: 100;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; align-items: flex-start; justify-content: center;
     padding: 20px;
+    overflow-y: auto;                 /* tall sheets (past day + completions) scroll instead of clipping */
+    -webkit-overflow-scrolling: touch;
   }
   .name-picker {
     background: var(--cream);
@@ -207,7 +209,22 @@
     padding: 24px 20px;
     width: 100%; max-width: 420px;
     box-shadow: var(--shadow-lg);
+    margin: auto;                     /* vertically centers when short, scrolls when tall */
+    position: relative;
   }
+  .sheet-x {
+    position: absolute; top: 10px; right: 10px;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-size: 16px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow);
+    z-index: 1;
+  }
+  .sheet-x:active { background: var(--cream-2); }
   .name-picker h2 { margin: 0 0 6px; font-size: 22px; color: var(--sage-deep); text-align: center; }
   .name-picker .sub { font-size: 14px; color: var(--ink-soft); text-align: center; margin-bottom: 18px; }
   .name-grid {
@@ -389,6 +406,90 @@
   .picker-chip.on { border-color: var(--sage); background: var(--sage-soft); box-shadow: 0 0 0 2px rgba(122, 147, 108, 0.18); }
   .picker-chip:active { background: var(--cream-2); }
 
+  /* ---- Daily quote ---- */
+  .quote {
+    margin: 0 0 14px;
+    padding: 12px 16px;
+    border-left: 3px solid var(--gold);
+    background: rgba(255, 253, 247, 0.6);
+    border-radius: 0 12px 12px 0;
+  }
+  .quote .q { font-family: 'Fraunces', serif; font-style: italic; font-size: 15px; color: var(--ink); line-height: 1.4; }
+  .quote .by { font-size: 12px; color: var(--ink-soft); margin-top: 6px; font-weight: 600; }
+
+  /* ---- Catch-up list ---- */
+  .catchup-row {
+    display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 6px;
+    cursor: pointer;
+  }
+  .catchup-row:active { background: var(--cream-2); }
+  .catchup-row .when { font-size: 11px; color: var(--ink-soft); }
+  .catchup-row .area { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .catchup-row .picker { font-size: 11px; color: var(--ink-soft); }
+  .catchup-btn {
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 13px;
+    background: var(--sage);
+    color: #fff;
+    white-space: nowrap;
+  }
+  .catchup-btn:disabled { opacity: 0.5; }
+  .catchup-more { display: block; margin: 6px auto 0; color: var(--sage-deep); font-size: 13px; font-weight: 600; }
+
+  /* ---- Photos ---- */
+  .photo-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .photo-thumb {
+    width: 56px; height: 56px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid var(--line);
+    background: var(--cream-2);
+    cursor: pointer;
+    display: block;
+  }
+  .photo-add {
+    width: 56px; height: 56px;
+    border-radius: 8px;
+    border: 1px dashed var(--sage);
+    background: #fffdf7;
+    color: var(--sage-deep);
+    font-size: 11px; font-weight: 600;
+    display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px;
+    line-height: 1;
+  }
+  .photo-add .ic { font-size: 18px; }
+  .photo-add:disabled { opacity: 0.5; }
+  .person-row .photo-strip, .edit-row .photo-strip { grid-column: 2 / -1; margin-top: 0; }
+  .done-form .photo-strip { margin: 0 0 12px; }
+  .done-form .photo-thumb { position: relative; }
+  .lightbox {
+    position: fixed; inset: 0;
+    background: rgba(30, 26, 22, 0.94);
+    z-index: 400;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 20px;
+    animation: celebFade 0.2s ease;
+  }
+  .lightbox img { max-width: 100%; max-height: 78vh; border-radius: 10px; box-shadow: var(--shadow-lg); }
+  .lightbox .cap { color: var(--cream); font-size: 13px; margin-top: 12px; text-align: center; }
+  .lightbox .danger-btn { color: #f3b8a4; margin-top: 10px; font-size: 13px; font-weight: 600; }
+  .lightbox .sheet-x { position: fixed; top: calc(14px + env(safe-area-inset-top)); right: 14px; }
+  .log-row .photos-n { font-size: 11px; color: var(--ink-soft); margin-left: 6px; }
+
+  /* ---- Release notes sheet ---- */
+  .release-item { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; margin-bottom: 12px; text-align: left; }
+  .release-item .ic { font-size: 22px; line-height: 1.2; text-align: center; }
+  .release-item .t { font-weight: 700; font-size: 15px; color: var(--ink); }
+  .release-item .d { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+
   /* ---- Misc ---- */
   .empty-state { text-align: center; padding: 30px 20px; color: var(--ink-soft); font-style: italic; }
   .toast {
@@ -557,7 +658,87 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const NAMES = ['Kara', 'Rachel', 'Ashley', 'Gail'];
 const WHO_KEY = 'tt.who';
+const RELEASE_KEY = 'tt.seenRelease';
+// Bump `id` whenever a new batch ships; every device shows the list once on next open.
+const RELEASE = {
+  id: '2026-09-19',
+  items: [
+    ['📋', 'Catch-up list', 'The Today tab now lists every day you\'re behind on, newest first, with a one-tap Done button. Tap a row to open the day instead.'],
+    ['📷', 'Photos', 'Add up to 4 photos when you mark yourself done. You can also add them later from your row on the Today tab, or from any past day.'],
+    ['✕',  'Easier to close', 'Every pop-up has an X in the corner now, and long ones scroll so the buttons are never stuck off-screen.'],
+    ['💬', 'Quote of the day', 'A new thought on cleanliness and order at the top of the Today tab each day, from scripture, Church leaders, and a few others.'],
+  ],
+};
 const DAY_TZ = 'America/Chicago';
+
+// ============== Daily quote ==============
+// Scripture, Church leaders, and everyone else, on cleanliness, order, and work.
+// Same quote for everyone on a given day: index = days since epoch (CT) mod length.
+const QUOTES = [
+  ['Organize yourselves; prepare every needful thing; and establish a house … a house of order, a house of God.', 'Doctrine and Covenants 88:119'],
+  ['Cleanliness is indeed next to godliness.', 'John Wesley'],
+  ['Let all things be done decently and in order.', '1 Corinthians 14:40'],
+  ['Outer order contributes to inner calm.', 'Gretchen Rubin'],
+  ['Cease to be idle; cease to be unclean; cease to find fault one with another.', 'Doctrine and Covenants 88:124'],
+  ['If you want to change the world, start off by making your bed.', 'Admiral William H. McRaven'],
+  ['By small and simple things are great things brought to pass.', 'Alma 37:6'],
+  ['Have nothing in your houses that you do not know to be useful, or believe to be beautiful.', 'William Morris'],
+  ['Behold, mine house is a house of order, saith the Lord God, and not a house of confusion.', 'Doctrine and Covenants 132:8'],
+  ['Cleanliness: Tolerate no uncleanliness in body, clothes, or habitation.', 'Benjamin Franklin, on his thirteen virtues'],
+  ['Work will win when wishy-washy wishing won\'t.', 'Thomas S. Monson'],
+  ['Set in order your houses; keep slothfulness and uncleanness far from you.', 'Doctrine and Covenants 90:18'],
+  ['Clutter is postponed decisions.', 'Barbara Hemphill'],
+  ['Whatsoever thy hand findeth to do, do it with thy might.', 'Ecclesiastes 9:10'],
+  ['The Lord loves effort.', 'Russell M. Nelson'],
+  ['Cleaning your house while your kids are still growing is like shoveling the sidewalk before it stops snowing.', 'Phyllis Diller'],
+  ['Order: Let all your things have their places; let each part of your business have its time.', 'Benjamin Franklin, on his thirteen virtues'],
+  ['And let all things be done in cleanliness before me.', 'Doctrine and Covenants 42:41'],
+  ['Keep only those things that speak to your heart.', 'Marie Kondo'],
+  ['She looketh well to the ways of her household, and eateth not the bread of idleness.', 'Proverbs 31:27'],
+  ['That which we persist in doing becomes easier to do, not that the nature of the thing has changed but that our power to do has increased.', 'Heber J. Grant, quoting Emerson'],
+  ['Simplify, simplify.', 'Henry David Thoreau'],
+  ['Be ye clean that bear the vessels of the Lord.', 'Isaiah 52:11'],
+  ['Many hands make light work.', 'John Heywood, 1546'],
+  ['Wherefore, be not weary in well-doing, for ye are laying the foundation of a great work. And out of small things proceedeth that which is great.', 'Doctrine and Covenants 64:33'],
+  ['Housekeeping ain\'t no joke.', 'Louisa May Alcott, Little Women'],
+  ['Create in me a clean heart, O God; and renew a right spirit within me.', 'Psalm 51:10'],
+  ['Clutter is not just the stuff on your floor. It\'s anything that stands between you and the life you want to be living.', 'Peter Walsh'],
+  ['Nurturing requires organization, patience, love, and work.', 'Julie B. Beck'],
+  ['And whatsoever ye do, do it heartily, as to the Lord, and not unto men.', 'Colossians 3:23'],
+  ['Housework done incorrectly still blesses your family.', 'Marla Cilley, the FlyLady'],
+  ['See that all these things are done in wisdom and order; for it is not requisite that a man should run faster than he has strength.', 'Mosiah 4:27'],
+  ['Discipline is the bridge between goals and accomplishment.', 'Jim Rohn'],
+  ['He that is faithful in that which is least is faithful also in much.', 'Luke 16:10'],
+  ['Do the best you can. But I want to emphasize that it be the best.', 'Gordon B. Hinckley'],
+  ['Wash you, make you clean; put away the evil of your doings from before mine eyes.', 'Isaiah 1:16'],
+  ['I hate housework! You make the beds, you do the dishes, and six months later you have to start all over again.', 'Joan Rivers'],
+  ['The world has need of willing men who wear the worker\'s seal. Come, help the good work move along; put your shoulder to the wheel.', 'Will L. Thompson, hymn 252'],
+  ['We are what we repeatedly do. Excellence, then, is not an act, but a habit.', 'Will Durant, summarizing Aristotle'],
+  ['There is beauty all around when there\'s love at home.', 'John Hugh McNaughton, hymn 294'],
+  ['Sanitation is more important than independence.', 'Mahatma Gandhi'],
+  ['Can ye look up to God at that day with a pure heart and clean hands?', 'Alma 5:19'],
+  ['The question of what you want to own is actually the question of how you want to live your life.', 'Marie Kondo'],
+  ['Set thine house in order.', '2 Kings 20:1'],
+  ['One of the advantages of being disorderly is that one is constantly making exciting discoveries.', 'A. A. Milne'],
+  ['Well done, thou good and faithful servant: thou hast been faithful over a few things, I will make thee ruler over many things.', 'Matthew 25:21'],
+  ['Life is too complicated not to be orderly.', 'Martha Stewart'],
+  ['When we\'re helping, we\'re happy, and we sing as we go.', 'Children\'s Songbook, "When We\'re Helping"'],
+  ['Then wake up and do something more than dream of your mansion above. Doing good is a pleasure, a joy beyond measure.', 'Will L. Thompson, hymn 223'],
+  ['God is not the author of confusion, but of peace.', '1 Corinthians 14:33'],
+  ['No other success can compensate for failure in the home.', 'David O. McKay, quoting J. E. McCulloch'],
+  ['While washing the dishes one should only be washing the dishes.', 'Thich Nhat Hanh'],
+  ['Know ye not that ye are the temple of God, and that the Spirit of God dwelleth in you?', '1 Corinthians 3:16'],
+  ['Who shall ascend into the hill of the Lord? … He that hath clean hands, and a pure heart.', 'Psalm 24:3–4'],
+  ['If ye are prepared ye shall not fear.', 'Doctrine and Covenants 38:30'],
+];
+function quoteForDay(ymd) {
+  const days = Math.round(new Date(ymd + 'T12:00:00Z').getTime() / 86400000);
+  return QUOTES[((days % QUOTES.length) + QUOTES.length) % QUOTES.length];
+}
+function renderQuote() {
+  const [q, by] = quoteForDay(state.todayDate);
+  return `<div class="quote"><div class="q">“${esc(q)}”</div><div class="by">— ${esc(by)}</div></div>`;
+}
 
 // ============== State ==============
 let state = {
@@ -568,6 +749,9 @@ let state = {
   pendingPicker: null,           // name of who should pick if no row yet
   recentDays: [],                // last ~30 tt_day rows desc
   recentCompletions: [],         // completions joined for those days
+  recentPhotos: [],              // all tt_photo rows (small table; loaded whole)
+  catchupExpanded: false,        // Today tab catch-up list: show all vs first 5
+  pendingDonePhotos: [],         // File objects staged in the Mark Done form before upload
   showNamePicker: false,
   editingDayId: null,            // tt_day.id currently open in the editor sheet
   planningDate: null,            // 'YYYY-MM-DD' of the day open in the day sheet
@@ -601,6 +785,123 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function avatarChar(name) { return name[0]; }
+
+// ---- Photos ----
+const PHOTO_BUCKET = 'tt-photos';
+const MAX_PHOTOS = 4;
+const PHOTO_MAX_PX = 1280;
+function photoUrl(path) {
+  return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${path}`;
+}
+function photosFor(completionId) {
+  if (!completionId) return [];
+  return state.recentPhotos.filter(p => p.completion_id === completionId);
+}
+// Thumbnail strip for a completion. `canAdd` renders the dashed add tile (wired via data-action).
+function photoStripHtml(completion, canAdd) {
+  const photos = completion ? photosFor(completion.id) : [];
+  if (photos.length === 0 && !canAdd) return '';
+  let html = `<div class="photo-strip">`;
+  for (const ph of photos) {
+    html += `<img class="photo-thumb" src="${esc(photoUrl(ph.path))}" alt="" loading="lazy" data-action="view-photo" data-photo-id="${esc(ph.id)}" />`;
+  }
+  if (canAdd && photos.length < MAX_PHOTOS) {
+    html += `<button class="photo-add" type="button" data-action="add-photo" data-completion-id="${esc(completion.id)}"><span class="ic">📷</span>Add</button>`;
+  }
+  html += `</div>`;
+  return html;
+}
+// Downscale to PHOTO_MAX_PX on the long edge and re-encode as JPEG so phone photos
+// (often 3-5 MB) upload fast on cell and stay small in storage.
+function resizeImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, PHOTO_MAX_PX / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.round(img.naturalWidth * scale);
+      const h = Math.round(img.naturalHeight * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('Could not process photo')), 'image/jpeg', 0.82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read photo')); };
+    img.src = url;
+  });
+}
+// Opens the native picker (camera or library on iPhone). Resolves to an array of Files.
+function pickPhotos(max) {
+  return new Promise(resolve => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = max > 1;
+    input.style.display = 'none';
+    input.onchange = () => { resolve(Array.from(input.files || []).slice(0, max)); input.remove(); };
+    document.body.appendChild(input);
+    input.click();
+  });
+}
+async function uploadPhotos(completionId, files) {
+  const existing = photosFor(completionId).length;
+  const room = Math.max(0, MAX_PHOTOS - existing);
+  const batch = files.slice(0, room);
+  if (files.length > room) toast(`Only ${MAX_PHOTOS} photos per day — kept the first ${room}`);
+  let n = 0;
+  for (const f of batch) {
+    const blob = await resizeImage(f);
+    const path = `${completionId}/${Date.now()}-${n}.jpg`;
+    const { error: upErr } = await sb.storage.from(PHOTO_BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+    if (upErr) throw new Error('Upload failed: ' + upErr.message);
+    const { error: rowErr } = await sb.from('tt_photo').insert({ completion_id: completionId, path });
+    if (rowErr) throw new Error('Could not save photo: ' + rowErr.message);
+    n++;
+  }
+  return n;
+}
+async function deletePhoto(photo) {
+  await sb.storage.from(PHOTO_BUCKET).remove([photo.path]);
+  const { error } = await sb.from('tt_photo').delete().eq('id', photo.id);
+  if (error) throw new Error('Could not remove photo: ' + error.message);
+}
+function openLightbox(photo) {
+  document.querySelectorAll('.lightbox').forEach(l => l.remove());
+  const comp = state.recentCompletions.find(c => c.id === photo.completion_id);
+  const day = comp ? state.recentDays.find(d => d.id === comp.day_id) : null;
+  const cap = [comp && comp.user_name, day && day.area, day && fmtDayShort(day.day_date)].filter(Boolean).join(' · ');
+  const box = document.createElement('div');
+  box.className = 'lightbox';
+  box.innerHTML = `
+    <button class="sheet-x" type="button" aria-label="Close">✕</button>
+    <img src="${esc(photoUrl(photo.path))}" alt="" />
+    <div class="cap">${esc(cap)}</div>
+    <button class="danger-btn" type="button">Remove photo</button>
+  `;
+  const close = () => box.remove();
+  box.querySelector('.sheet-x').onclick = close;
+  box.addEventListener('click', ev => { if (ev.target === box) close(); });
+  box.querySelector('.danger-btn').onclick = async () => {
+    if (!confirm('Remove this photo?')) return;
+    try {
+      await deletePhoto(photo);
+      close();
+      await refreshKeepingSheet();
+      toast('Photo removed');
+    } catch (e) { toast(e.message); }
+  };
+  document.body.appendChild(box);
+}
+// Reload data and re-render, then re-open the day sheet if one was open so photo strips update.
+async function refreshKeepingSheet() {
+  const ymd = state.planningDate;
+  await refresh();
+  if (ymd) {
+    const row = state.recentDays.find(d => d.day_date === ymd) || null;
+    openDaySheet(ymd, row);
+  }
+}
 function toast(msg) {
   document.querySelectorAll('.toast').forEach(t => t.remove());
   const t = document.createElement('div');
@@ -718,6 +1019,15 @@ async function loadRecent(days = 2000) {
     .in('day_id', ids);
   if (e2) throw e2;
   state.recentCompletions = comps || [];
+
+  // Photos: whole table (small), avoids a long .in() URL as history grows.
+  const { data: photos, error: e3 } = await sb
+    .from('tt_photo')
+    .select('*')
+    .order('created_at', { ascending: true })
+    .limit(5000);
+  if (e3) throw e3;
+  state.recentPhotos = photos || [];
 }
 
 // ============== Actions ==============
@@ -751,7 +1061,7 @@ async function markDone(note, minutes) {
     note: note && note.trim() ? note.trim() : null,
     minutes_spent: minutes && minutes > 0 ? minutes : null,
   };
-  const { error } = await sb.from('tt_completion').insert(payload);
+  const { data: row, error } = await sb.from('tt_completion').insert(payload).select().single();
   if (error) {
     if (error.code === '23505') {
       toast('Already marked done!');
@@ -761,8 +1071,58 @@ async function markDone(note, minutes) {
     await refresh();
     return;
   }
+  // Photos staged in the form upload after the completion row exists. A failed upload
+  // still leaves the completion in place — she can retry from the person row.
+  if (state.pendingDonePhotos.length > 0) {
+    const btn = document.querySelector('[data-action="done"]');
+    if (btn) btn.textContent = 'Uploading photos…';
+    try { await uploadPhotos(row.id, state.pendingDonePhotos); }
+    catch (e) { toast(e.message); }
+    state.pendingDonePhotos = [];
+  }
   await refresh();
   celebrate(state.who);
+}
+
+// One-tap catch-up: mark `who` done for a past day. No celebration (that's for today).
+async function catchUp(dayId) {
+  const { error } = await sb.from('tt_completion').insert({ day_id: dayId, user_name: state.who });
+  if (error && error.code !== '23505') { toast('Could not save: ' + error.message); return; }
+  await refresh();
+  const day = state.recentDays.find(d => d.id === dayId);
+  toast(`Caught up: ${day ? day.area : 'done'} ✓`);
+}
+
+// Days before today with an area set where `name` has no completion, newest first.
+function catchupDays(name) {
+  const doneDayIds = new Set(state.recentCompletions.filter(c => c.user_name === name).map(c => c.day_id));
+  return state.recentDays.filter(d => d.day_date < state.todayDate && !doneDayIds.has(d.id));
+}
+
+function renderCatchup() {
+  const days = catchupDays(state.who);
+  if (days.length === 0) return '';
+  const LIMIT = 5;
+  const shown = state.catchupExpanded ? days : days.slice(0, LIMIT);
+  let html = `<div class="card" style="padding: 12px 14px; margin-top: 14px;">
+    <div class="label" style="margin-bottom: 8px;">Catch up · ${days.length} behind</div>`;
+  for (const d of shown) {
+    html += `
+      <div class="catchup-row" data-action="open-day" data-ymd="${esc(d.day_date)}" data-day-id="${esc(d.id)}">
+        <div>
+          <div class="when">${esc(fmtDay(d.day_date))}</div>
+          <div class="area">${esc(d.area)}</div>
+          <div class="picker">picked by ${esc(d.picker)}</div>
+        </div>
+        <button class="catchup-btn" type="button" data-action="catchup-done" data-day-id="${esc(d.id)}">Done ✓</button>
+      </div>
+    `;
+  }
+  if (days.length > LIMIT) {
+    html += `<button class="catchup-more" type="button" data-action="catchup-toggle">${state.catchupExpanded ? 'Show fewer' : `Show ${days.length - LIMIT} more`}</button>`;
+  }
+  html += `</div>`;
+  return html;
 }
 
 async function refresh() {
@@ -881,7 +1241,7 @@ function renderBody() {
 function renderToday() {
   const dateLine = `<div class="card" style="padding: 10px 14px; margin-bottom: 12px; background: transparent; border: none; box-shadow: none;">
     <span class="label" style="margin: 0;">${esc(fmtDay(state.todayDate))}</span>
-  </div>`;
+  </div>` + renderQuote();
 
   if (!state.today) {
     const picker = state.pendingPicker;
@@ -904,7 +1264,7 @@ function renderToday() {
             <button class="btn btn-primary" data-action="pick" type="button">Set today's area</button>
           </div>
         </div>
-      `;
+      ` + renderCatchup();
     } else {
       return dateLine + `
         <div class="card pending">
@@ -915,7 +1275,7 @@ function renderToday() {
             <button class="btn btn-secondary" data-action="refresh" type="button">Refresh</button>
           </div>
         </div>
-      `;
+      ` + renderCatchup();
     }
   }
 
@@ -959,12 +1319,22 @@ function renderToday() {
           <div class="meta">${meta}</div>
         </div>
         <span class="status ${done ? 'done' : 'pending'}">${done ? '✓ Done' : '…'}</span>
+        ${photoStripHtml(c, done && isMe)}
       </div>
     `;
   }
   html += `</div>`;
 
   if (!myCompletion) {
+    // Staged photos (not yet uploaded) preview as object URLs
+    let staged = `<div class="photo-strip">`;
+    state.pendingDonePhotos.forEach((f, i) => {
+      staged += `<img class="photo-thumb" src="${URL.createObjectURL(f)}" alt="" data-action="unstage-photo" data-idx="${i}" title="Tap to remove" />`;
+    });
+    if (state.pendingDonePhotos.length < MAX_PHOTOS) {
+      staged += `<button class="photo-add" type="button" data-action="stage-photo"><span class="ic">📷</span>Photo</button>`;
+    }
+    staged += `</div>`;
     html += `
       <div class="done-form">
         <div class="label" style="margin-bottom: 10px;">Mark yourself done</div>
@@ -976,6 +1346,8 @@ function renderToday() {
           <label for="done-mins">Minutes (optional)</label>
           <input id="done-mins" type="number" min="1" max="600" placeholder="e.g. 25" inputmode="numeric" />
         </div>
+        <label>Photos (optional, up to ${MAX_PHOTOS})</label>
+        ${staged}
         <button class="btn btn-primary" data-action="done" type="button">I'm Done ✓</button>
       </div>
     `;
@@ -983,6 +1355,7 @@ function renderToday() {
     html += `<div class="empty-state">You're done for today. Nice. 🧽</div>`;
   }
 
+  html += renderCatchup();
   return html;
 }
 
@@ -1027,7 +1400,11 @@ function renderHistory() {
           <div class="when">${esc(fmtDayShort(d.day_date))}</div>
           <div class="what">
             <div class="area">${esc(d.area)}</div>
-            <div class="picker">picked by ${esc(d.picker)}</div>
+            <div class="picker">picked by ${esc(d.picker)}${(() => {
+              const ids = new Set(state.recentCompletions.filter(c => c.day_id === d.id).map(c => c.id));
+              const n = state.recentPhotos.filter(p => ids.has(p.completion_id)).length;
+              return n ? `<span class="photos-n">📷 ${n}</span>` : '';
+            })()}</div>
           </div>
           <div class="checks">${checks}</div>
         </div>
@@ -1119,6 +1496,7 @@ function buildNamePicker(isFirstRun) {
         `).join('')}
       </div>
       ${isFirstRun ? '' : `<button class="close" data-action="close-name-picker" type="button">Cancel</button>`}
+      ${isFirstRun ? '' : `<button class="sheet-x" data-action="close-name-picker" type="button" aria-label="Close">✕</button>`}
     </div>
   `;
   if (!isFirstRun) {
@@ -1187,6 +1565,7 @@ function buildDaySheet(ymd, existingRow) {
           <button class="toggle-btn ${done ? 'on' : ''}" data-action="toggle-done" data-day-id="${esc(existingRow.id)}" data-name="${esc(name)}" type="button">
             ${done ? '✓ Done' : 'Mark done'}
           </button>
+          ${photoStripHtml(c, done)}
         </div>
       `;
     }
@@ -1200,6 +1579,7 @@ function buildDaySheet(ymd, existingRow) {
   wrap.className = 'name-picker-wrap';
   wrap.innerHTML = `
     <div class="name-picker day-sheet">
+      <button class="sheet-x" data-action="close-day-editor" type="button" aria-label="Close">✕</button>
       <h2>${esc(fmtDay(ymd))}</h2>
       ${predHtml}
 
@@ -1342,6 +1722,7 @@ function attachHandlers() {
     const action = el.getAttribute('data-action');
     el.onclick = async (ev) => {
       ev.preventDefault();
+      ev.stopPropagation(); // nested actions (e.g. Done button inside a tappable catch-up row) must not fire the parent
       if (action === 'switch-name') {
         state.showNamePicker = true;
         document.body.appendChild(buildNamePicker(false));
@@ -1428,6 +1809,59 @@ function attachHandlers() {
         closeDayEditor();
         return;
       }
+      if (action === 'catchup-done') {
+        const dayId = el.getAttribute('data-day-id');
+        el.disabled = true; el.textContent = 'Saving…';
+        try { await catchUp(dayId); } catch (e) { toast(e.message); }
+        return;
+      }
+      if (action === 'catchup-toggle') {
+        state.catchupExpanded = !state.catchupExpanded;
+        render();
+        return;
+      }
+      if (action === 'stage-photo') {
+        const files = await pickPhotos(MAX_PHOTOS - state.pendingDonePhotos.length);
+        if (files.length === 0) return;
+        // Preserve typed note/minutes across the re-render
+        const note = document.getElementById('done-note')?.value ?? '';
+        const mins = document.getElementById('done-mins')?.value ?? '';
+        state.pendingDonePhotos = state.pendingDonePhotos.concat(files).slice(0, MAX_PHOTOS);
+        render();
+        const n = document.getElementById('done-note'); if (n) n.value = note;
+        const m = document.getElementById('done-mins'); if (m) m.value = mins;
+        return;
+      }
+      if (action === 'unstage-photo') {
+        const idx = parseInt(el.getAttribute('data-idx'), 10);
+        const note = document.getElementById('done-note')?.value ?? '';
+        const mins = document.getElementById('done-mins')?.value ?? '';
+        state.pendingDonePhotos.splice(idx, 1);
+        render();
+        const n = document.getElementById('done-note'); if (n) n.value = note;
+        const m = document.getElementById('done-mins'); if (m) m.value = mins;
+        return;
+      }
+      if (action === 'add-photo') {
+        const completionId = el.getAttribute('data-completion-id');
+        const files = await pickPhotos(MAX_PHOTOS - photosFor(completionId).length);
+        if (files.length === 0) return;
+        el.disabled = true; el.innerHTML = '<span class="ic">⏳</span>…';
+        try {
+          const n = await uploadPhotos(completionId, files);
+          await refreshKeepingSheet();
+          toast(`${n} photo${n === 1 ? '' : 's'} added 📷`);
+        } catch (e) {
+          toast(e.message);
+          if (document.body.contains(el)) { el.disabled = false; el.innerHTML = '<span class="ic">📷</span>Add'; }
+        }
+        return;
+      }
+      if (action === 'view-photo') {
+        const photo = state.recentPhotos.find(p => p.id === el.getAttribute('data-photo-id'));
+        if (photo) openLightbox(photo);
+        return;
+      }
       if (action === 'toggle-done') {
         const day_id = el.getAttribute('data-day-id');
         const name = el.getAttribute('data-name');
@@ -1440,6 +1874,37 @@ function attachHandlers() {
   });
 }
 
+// ============== Release notes (shown once per device per release) ==============
+function maybeShowReleaseNotes() {
+  let seen = null;
+  try { seen = localStorage.getItem(RELEASE_KEY); } catch (e) {}
+  if (seen === RELEASE.id) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'name-picker-wrap';
+  wrap.innerHTML = `
+    <div class="name-picker">
+      <button class="sheet-x" type="button" aria-label="Close">✕</button>
+      <h2>What's new</h2>
+      <div class="sub">A few updates to Tidy Tolzmanns</div>
+      ${RELEASE.items.map(([ic, t, d]) => `
+        <div class="release-item">
+          <div class="ic">${ic}</div>
+          <div><div class="t">${esc(t)}</div><div class="d">${esc(d)}</div></div>
+        </div>
+      `).join('')}
+      <button class="btn btn-primary" type="button" style="margin-top: 6px;">Got it</button>
+    </div>
+  `;
+  const close = () => {
+    try { localStorage.setItem(RELEASE_KEY, RELEASE.id); } catch (e) {}
+    wrap.remove();
+  };
+  wrap.querySelector('.sheet-x').onclick = close;
+  wrap.querySelector('.btn').onclick = close;
+  wrap.addEventListener('click', ev => { if (ev.target === wrap) close(); });
+  document.body.appendChild(wrap);
+}
+
 // ============== Boot ==============
 (async function boot() {
   try {
@@ -1449,6 +1914,8 @@ function attachHandlers() {
     return;
   }
   subscribeLiveUpdates();
+  // Returning users see the release list once; first-run users are busy picking a name.
+  if (state.who) maybeShowReleaseNotes();
 })();
 
 // Live updates: refresh on any tt_day / tt_completion change.
@@ -1474,6 +1941,7 @@ function subscribeLiveUpdates() {
       scheduleRefresh();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tt_day' }, scheduleRefresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tt_photo' }, scheduleRefresh)
     .subscribe();
 }
 
