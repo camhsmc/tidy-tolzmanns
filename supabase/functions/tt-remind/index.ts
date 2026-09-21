@@ -75,6 +75,9 @@ Deno.serve(async (req) => {
 
   // ---- Normal run ----
   const today = ymdIn(DAY_TZ);
+  // Weekdays only (Central). The cron is already Mon–Fri; this guards manual runs too.
+  const dow = new Intl.DateTimeFormat('en-US', { timeZone: DAY_TZ, weekday: 'short' }).format(new Date());
+  if (dow === 'Sat' || dow === 'Sun') return Response.json({ today, skipped: 'weekend' });
   const { data: dayRows, error: e1 } = await sb.from('tt_day').select('day_date,picker').lte('day_date', today).order('day_date', { ascending: false }).limit(1);
   if (e1) return Response.json({ error: e1.message }, { status: 500 });
   const latest = dayRows?.[0];
