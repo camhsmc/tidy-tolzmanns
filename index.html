@@ -469,7 +469,20 @@
   .photo-add:disabled { opacity: 0.5; }
   .person-row .photo-strip, .edit-row .photo-strip { grid-column: 2 / -1; margin-top: 0; }
   .done-form .photo-strip { margin: 0 0 12px; }
-  .done-form .photo-thumb { position: relative; }
+  .staged { position: relative; width: 56px; height: 56px; }
+  .staged .photo-thumb { width: 56px; height: 56px; }
+  .staged .x {
+    position: absolute; top: -6px; right: -6px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--ink); color: #fff;
+    font-size: 12px; font-weight: 700; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 2px solid var(--cream);
+  }
+  .card.weekend {
+    background: linear-gradient(160deg, #fffdf7 0%, #efe6d2 100%);
+    border-color: #e0d5bb;
+  }
   .lightbox {
     position: fixed; inset: 0;
     background: rgba(30, 26, 22, 0.94);
@@ -669,8 +682,12 @@ const WHO_KEY = 'tt.who';
 const RELEASE_KEY = 'tt.seenRelease';
 // Bump `id` whenever a new batch ships; every device shows the list once on next open.
 const RELEASE = {
-  id: '2026-09-19b',
+  id: '2026-09-28',
   items: [
+    ['🛋️', 'Weekends off', 'No picks, no waiting, and no reminders on Saturdays and Sundays. The rotation picks back up Monday where it left off.'],
+    ['📷', 'Photo fix', 'Tapping a photo you just added now shows it big instead of removing it. Use the ✕ badge or the Remove button to take one off.'],
+  ],
+  older: [
     ['📋', 'Catch-up list', 'The Today tab now lists every day you\'re behind on, newest first, with a one-tap Done button. Tap a row to open the day instead.'],
     ['📷', 'Photos', 'Add up to 4 photos when you mark yourself done. You can also add them later from your row on the Today tab, or from any past day.'],
     ['✕',  'Easier to close', 'Every pop-up has an X in the corner now, and long ones scroll so the buttons are never stuck off-screen.'],
@@ -903,6 +920,35 @@ function openLightbox(photo) {
       toast('Photo removed');
     } catch (e) { toast(e.message); }
   };
+  document.body.appendChild(box);
+}
+// Remove a not-yet-uploaded photo from the Mark Done form, keeping typed note/minutes.
+function unstagePhoto(idx) {
+  const note = document.getElementById('done-note')?.value ?? '';
+  const mins = document.getElementById('done-mins')?.value ?? '';
+  state.pendingDonePhotos.splice(idx, 1);
+  render();
+  const n = document.getElementById('done-note'); if (n) n.value = note;
+  const m = document.getElementById('done-mins'); if (m) m.value = mins;
+}
+// Big preview of a staged (local, not yet uploaded) photo with an explicit Remove.
+function openStagedPreview(idx) {
+  const f = state.pendingDonePhotos[idx];
+  if (!f) return;
+  document.querySelectorAll('.lightbox').forEach(l => l.remove());
+  const url = URL.createObjectURL(f);
+  const box = document.createElement('div');
+  box.className = 'lightbox';
+  box.innerHTML = `
+    <button class="sheet-x" type="button" aria-label="Close">✕</button>
+    <img src="${url}" alt="" />
+    <div class="cap">Will upload when you tap I'm Done</div>
+    <button class="danger-btn" type="button">Remove this photo</button>
+  `;
+  const close = () => { box.remove(); URL.revokeObjectURL(url); };
+  box.querySelector('.sheet-x').onclick = close;
+  box.addEventListener('click', ev => { if (ev.target === box) close(); });
+  box.querySelector('.danger-btn').onclick = () => { close(); unstagePhoto(idx); toast('Photo removed'); };
   document.body.appendChild(box);
 }
 // Reload data and re-render, then re-open the day sheet if one was open so photo strips update.
@@ -1272,16 +1318,32 @@ function computeStreak(name) {
   return streak;
 }
 
+function isWeekend(ymd) {
+  const dow = new Date(ymd + 'T12:00:00').getDay();
+  return dow === 0 || dow === 6;
+}
+// Number of weekdays in (fromYmd, toYmd]. The rotation only advances on weekdays.
+function weekdaysBetween(fromYmd, toYmd) {
+  let n = 0;
+  const d = new Date(fromYmd + 'T12:00:00');
+  const end = new Date(toYmd + 'T12:00:00');
+  while (d < end) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) n++;
+  }
+  return n;
+}
 function predictPicker(ymd) {
   // Predict whose turn `ymd` falls on, assuming one rotation step per calendar day.
   // Prefer walking forward from the latest prior row; fall back to walking backward
   // from the earliest later row (for backfilling dates before the app existed).
-  const targetDate = new Date(ymd + 'T12:00:00');
   const prior = state.recentDays.filter(r => r.day_date < ymd);
   if (prior.length > 0) {
     prior.sort((a, b) => a.day_date < b.day_date ? 1 : -1);
     const latest = prior[0];
-    const dayDiff = Math.round((targetDate - new Date(latest.day_date + 'T12:00:00')) / (24 * 3600 * 1000));
+    // Weekdays only; a weekend target suggests the following Monday's picker.
+    const dayDiff = weekdaysBetween(latest.day_date, ymd) + (isWeekend(ymd) ? 1 : 0);
     const startIdx = NAMES.indexOf(latest.picker);
     return NAMES[(startIdx + dayDiff) % NAMES.length];
   }
@@ -1289,7 +1351,7 @@ function predictPicker(ymd) {
   if (later.length > 0) {
     later.sort((a, b) => a.day_date < b.day_date ? -1 : 1);
     const earliest = later[0];
-    const dayDiff = Math.round((new Date(earliest.day_date + 'T12:00:00') - targetDate) / (24 * 3600 * 1000));
+    const dayDiff = weekdaysBetween(ymd, earliest.day_date) - (isWeekend(ymd) ? 1 : 0);
     const startIdx = NAMES.indexOf(earliest.picker);
     return NAMES[((startIdx - dayDiff) % NAMES.length + NAMES.length) % NAMES.length];
   }
@@ -1360,6 +1422,15 @@ function renderToday() {
   if (!state.today) {
     const picker = state.pendingPicker;
     const isMe = picker === state.who;
+    if (isWeekend(state.todayDate)) {
+      return dateLine + `
+        <div class="card weekend">
+          <div class="label">Weekend</div>
+          <h2>No cleaning on weekends</h2>
+          <div class="picked-by">Back Monday${picker === state.who ? '. It\'s your turn to pick' : `, ${esc(picker)} picks`}. A good day to catch up if you're behind.</div>
+        </div>
+      ` + renderCatchup() + renderReminders();
+    }
     if (isMe) {
       return dateLine + `
         <div class="card pending">
@@ -1443,7 +1514,10 @@ function renderToday() {
     // Staged photos (not yet uploaded) preview as object URLs
     let staged = `<div class="photo-strip">`;
     state.pendingDonePhotos.forEach((f, i) => {
-      staged += `<img class="photo-thumb" src="${URL.createObjectURL(f)}" alt="" data-action="unstage-photo" data-idx="${i}" title="Tap to remove" />`;
+      staged += `<span class="staged">
+        <img class="photo-thumb" src="${URL.createObjectURL(f)}" alt="" data-action="preview-staged" data-idx="${i}" />
+        <button class="x" type="button" data-action="unstage-photo" data-idx="${i}" aria-label="Remove photo">✕</button>
+      </span>`;
     });
     if (state.pendingDonePhotos.length < MAX_PHOTOS) {
       staged += `<button class="photo-add" type="button" data-action="stage-photo"><span class="ic">📷</span>Photo</button>`;
@@ -1962,13 +2036,11 @@ function attachHandlers() {
         return;
       }
       if (action === 'unstage-photo') {
-        const idx = parseInt(el.getAttribute('data-idx'), 10);
-        const note = document.getElementById('done-note')?.value ?? '';
-        const mins = document.getElementById('done-mins')?.value ?? '';
-        state.pendingDonePhotos.splice(idx, 1);
-        render();
-        const n = document.getElementById('done-note'); if (n) n.value = note;
-        const m = document.getElementById('done-mins'); if (m) m.value = mins;
+        unstagePhoto(parseInt(el.getAttribute('data-idx'), 10));
+        return;
+      }
+      if (action === 'preview-staged') {
+        openStagedPreview(parseInt(el.getAttribute('data-idx'), 10));
         return;
       }
       if (action === 'add-photo') {

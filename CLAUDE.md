@@ -24,9 +24,13 @@ Photos live in the public Storage bucket `tt-photos` (5 MB cap, image/* only), p
 - `sw.js` — push + notificationclick handlers only, no caching. Registered from `index.html` on boot.
 - "Pick-day reminders" card at the bottom of the Today tab: Turn on → `Notification.requestPermission` → `pushManager.subscribe` (VAPID public key in `index.html`) → upsert `tt_push_sub` keyed by endpoint with `user_name = state.who` and the device timezone. Switching name re-points the row. Turn off deletes the row and unsubscribes.
 - iPhone: only works from the Home Screen install (iOS 16.4+); the card says so when opened in Safari.
-- Edge function `tt-remind` (`supabase/functions/tt-remind/index.ts`, deployed with `--no-verify-jwt`, guarded by `x-webhook-secret` = vault `tt_remind_secret`). pg_cron `tt-remind` at `2 13,14,16,17 * * 1-5` UTC, weekdays only (covers 8am + 11am Central across DST; the function skips the off-hour run and also skips Sat/Sun itself). Each run: today's picker (Central) → if no `tt_day` row yet → for that person's devices, if their **local** hour is 8 or 11 → claim `(day, user, slot)` in `tt_reminder_log` → send. Two consecutive 404/410s drop a device (`fail_count`).
+- Edge function `tt-remind` (`supabase/functions/tt-remind/index.ts`, deployed with `--no-verify-jwt`, guarded by `x-webhook-secret` = vault `tt_remind_secret`). pg_cron `tt-remind` at `2 13,14,15,16,17,18 * * 1-5` UTC, weekdays only. Covers 8am + 11am for Central **and** Mountain across DST (Kara is Chicago; Ashley + Gail Denver; Rachel Boise, per `tt_push_sub.tz`). The function skips off-hour runs and Sat/Sun itself. Each run: today's picker (Central) → if no `tt_day` row yet → for that person's devices, if their **local** hour is 8 or 11 → claim `(day, user, slot)` in `tt_reminder_log` → send. Two consecutive 404/410s drop a device (`fail_count`).
 - Test a phone: `curl -X POST .../functions/v1/tt-remind -H "x-webhook-secret: <vault secret>" -d '{"test":"Kara"}'`.
 - Secrets on the function: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `TT_REMIND_SECRET`. Migrations: `tidy_tolzmanns_push_reminders`, `tidy_tolzmanns_push_fail_count`.
+
+## Weekends
+
+The family doesn't clean Sat/Sun. Today tab shows a "No cleaning on weekends" card when there's no row for a weekend day (a weekend row created via the calendar still works normally). `predictPicker` steps the rotation over weekdays only (`weekdaysBetween`); a weekend target suggests Monday's picker. Actual picker logic is unchanged: next after the latest row.
 
 ## Release notes
 
