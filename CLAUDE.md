@@ -32,6 +32,10 @@ Photos live in the public Storage bucket `tt-photos` (5 MB cap, image/* only), p
 
 The family doesn't clean Sat/Sun. Today tab shows a "No cleaning on weekends" card when there's no row for a weekend day (a weekend row created via the calendar still works normally). `predictPicker` steps the rotation over weekdays only (`weekdaysBetween`); a weekend target suggests Monday's picker. Actual picker logic is unchanged: next after the latest row.
 
+## Feedback & ideas
+
+"Ideas & feedback" card under the reminders card on the Today tab opens a sheet (Idea / Problem chips + message). Inserts into `tt_feedback (id, user_name, kind 'idea'|'problem', message ≤2000, created_at)`. RLS is **insert-only** for the public key, so the app can't read feedback back; Cam reads it via SQL: `select created_at, user_name, kind, message from tt_feedback order by created_at desc`. No notification on submit. Migration: `tidy_tolzmanns_feedback`.
+
 ## Release notes
 
 `RELEASE` constant near the top of the script. Bump `id` when a batch ships; each device shows the list once (`localStorage['tt.seenRelease']`).

@@ -505,6 +505,11 @@
   .reminders .btn { margin-top: 10px; }
   .reminders .btn-ghost { width: auto; padding: 6px 0; font-size: 13px; }
 
+  /* ---- Feedback sheet ---- */
+  .fb-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+  .fb-kinds .picker-chip { justify-content: center; }
+  .fb-sheet textarea { min-height: 120px; }
+
   /* ---- Release notes sheet ---- */
   .release-item { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; margin-bottom: 12px; text-align: left; }
   .release-item .ic { font-size: 22px; line-height: 1.2; text-align: center; }
@@ -682,12 +687,13 @@ const WHO_KEY = 'tt.who';
 const RELEASE_KEY = 'tt.seenRelease';
 // Bump `id` whenever a new batch ships; every device shows the list once on next open.
 const RELEASE = {
-  id: '2026-09-28',
+  id: '2026-10-04',
   items: [
-    ['🛋️', 'Weekends off', 'No picks, no waiting, and no reminders on Saturdays and Sundays. The rotation picks back up Monday where it left off.'],
-    ['📷', 'Photo fix', 'Tapping a photo you just added now shows it big instead of removing it. Use the ✕ badge or the Remove button to take one off.'],
+    ['💡', 'Ideas & feedback', 'Have an idea to make the app better, or is something not working? Tap Share an idea at the bottom of the Today tab and it goes straight to Cam.'],
   ],
   older: [
+    ['🛋️', 'Weekends off', 'No picks, no waiting, and no reminders on Saturdays and Sundays. The rotation picks back up Monday where it left off.'],
+    ['📷', 'Photo fix', 'Tapping a photo you just added now shows it big instead of removing it. Use the ✕ badge or the Remove button to take one off.'],
     ['📋', 'Catch-up list', 'The Today tab now lists every day you\'re behind on, newest first, with a one-tap Done button. Tap a row to open the day instead.'],
     ['📷', 'Photos', 'Add up to 4 photos when you mark yourself done. You can also add them later from your row on the Today tab, or from any past day.'],
     ['✕',  'Easier to close', 'Every pop-up has an X in the corner now, and long ones scroll so the buttons are never stuck off-screen.'],
@@ -1429,7 +1435,7 @@ function renderToday() {
           <h2>No cleaning on weekends</h2>
           <div class="picked-by">Back Monday${picker === state.who ? '. It\'s your turn to pick' : `, ${esc(picker)} picks`}. A good day to catch up if you're behind.</div>
         </div>
-      ` + renderCatchup() + renderReminders();
+      ` + renderCatchup() + renderReminders() + renderFeedbackCard();
     }
     if (isMe) {
       return dateLine + `
@@ -1449,7 +1455,7 @@ function renderToday() {
             <button class="btn btn-primary" data-action="pick" type="button">Set today's area</button>
           </div>
         </div>
-      ` + renderCatchup() + renderReminders();
+      ` + renderCatchup() + renderReminders() + renderFeedbackCard();
     } else {
       return dateLine + `
         <div class="card pending">
@@ -1460,7 +1466,7 @@ function renderToday() {
             <button class="btn btn-secondary" data-action="refresh" type="button">Refresh</button>
           </div>
         </div>
-      ` + renderCatchup() + renderReminders();
+      ` + renderCatchup() + renderReminders() + renderFeedbackCard();
     }
   }
 
@@ -1544,7 +1550,7 @@ function renderToday() {
   }
 
   html += renderCatchup();
-  html += renderReminders();
+  html += renderReminders() + renderFeedbackCard();
   return html;
 }
 
@@ -1952,6 +1958,7 @@ function attachHandlers() {
         try { await markDone(note, mins); } catch (e) { toast(e.message); }
         return;
       }
+      if (action === 'open-feedback') { openFeedbackSheet(); return; }
       if (action === 'refresh') {
         try { await refresh(); toast('Refreshed'); } catch (e) { toast(e.message); }
         return;
@@ -2073,6 +2080,76 @@ function attachHandlers() {
       }
     };
   });
+}
+
+// ============== Feedback & ideas (insert-only into tt_feedback) ==============
+function renderFeedbackCard() {
+  return `
+    <div class="card" style="margin-top: 14px;">
+      <div class="reminders">
+        <div class="ic">💡</div>
+        <div>
+          <div class="t">Ideas & feedback</div>
+          <div class="d">Have an idea to make the app better, or is something not working? Send it to Cam.</div>
+          <button class="btn btn-secondary" data-action="open-feedback" type="button">Share an idea</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function openFeedbackSheet() {
+  document.querySelectorAll('.name-picker-wrap').forEach(n => n.remove());
+  const wrap = document.createElement('div');
+  wrap.className = 'name-picker-wrap';
+  wrap.innerHTML = `
+    <div class="name-picker fb-sheet">
+      <button class="sheet-x" type="button" aria-label="Close">✕</button>
+      <h2>Ideas & feedback</h2>
+      <div class="sub">Goes straight to Cam, from ${esc(state.who)}</div>
+      <div class="fb-kinds">
+        <button class="picker-chip on" data-kind="idea" type="button">💡 Idea</button>
+        <button class="picker-chip" data-kind="problem" type="button">🐞 Problem</button>
+      </div>
+      <div class="field">
+        <textarea id="fb-message" maxlength="2000" placeholder="What would make the app better?"></textarea>
+      </div>
+      <button class="btn btn-primary" id="fb-send" type="button">Send</button>
+    </div>
+  `;
+  const msg = wrap.querySelector('#fb-message');
+  const send = wrap.querySelector('#fb-send');
+  const chips = wrap.querySelectorAll('.fb-kinds .picker-chip');
+  const close = () => wrap.remove();
+  // Don't lose a typed message to a stray tap on the X or the backdrop.
+  const guardedClose = () => {
+    if (msg.value.trim() && !confirm('Discard your message?')) return;
+    close();
+  };
+  chips.forEach(c => c.onclick = () => {
+    chips.forEach(x => x.classList.remove('on'));
+    c.classList.add('on');
+    msg.placeholder = c.getAttribute('data-kind') === 'problem'
+      ? 'What happened, and what were you trying to do?'
+      : 'What would make the app better?';
+  });
+  wrap.querySelector('.sheet-x').onclick = guardedClose;
+  wrap.addEventListener('click', ev => { if (ev.target === wrap) guardedClose(); });
+  send.onclick = async () => {
+    const message = msg.value.trim();
+    if (!message) { toast('Type your idea first'); return; }
+    const kind = wrap.querySelector('.fb-kinds .picker-chip.on').getAttribute('data-kind');
+    send.disabled = true; send.textContent = 'Sending…';
+    // No .select(): the table is insert-only for the public key.
+    const { error } = await sb.from('tt_feedback').insert({ user_name: state.who, kind, message });
+    if (error) {
+      send.disabled = false; send.textContent = 'Send';
+      toast('Could not send: ' + error.message);
+      return;
+    }
+    close();
+    toast('Sent to Cam. Thank you!');
+  };
+  document.body.appendChild(wrap);
 }
 
 // ============== Release notes (shown once per device per release) ==============
