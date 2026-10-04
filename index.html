@@ -687,8 +687,9 @@ const WHO_KEY = 'tt.who';
 const RELEASE_KEY = 'tt.seenRelease';
 // Bump `id` whenever a new batch ships; every device shows the list once on next open.
 const RELEASE = {
-  id: '2026-10-04',
+  id: '2026-10-04b',
   items: [
+    ['📷', 'Before pictures stick', 'Photos now save the moment you add them, before you tap I\'m Done. Take a before picture, go clean, and it will still be there when you come back.'],
     ['💡', 'Ideas & feedback', 'Have an idea to make the app better, or is something not working? Tap Share an idea at the bottom of the Today tab and it goes straight to Cam.'],
   ],
   older: [
@@ -785,7 +786,6 @@ let state = {
   recentCompletions: [],         // completions joined for those days
   recentPhotos: [],              // all tt_photo rows (small table; loaded whole)
   catchupExpanded: false,        // Today tab catch-up list: show all vs first 5
-  pendingDonePhotos: [],         // File objects staged in the Mark Done form before upload
   push: { reg: null, subscribed: false, permission: 'default', ready: false }, // web push state for this device
   showNamePicker: false,
   editingDayId: null,            // tt_day.id currently open in the editor sheet
@@ -831,6 +831,12 @@ function photoUrl(path) {
 function photosFor(completionId) {
   if (!completionId) return [];
   return state.recentPhotos.filter(p => p.completion_id === completionId);
+}
+// Photos `name` saved for a day before marking done (e.g. a "before" picture).
+// A DB trigger attaches them to the completion when it's created.
+function pendingPhotosFor(dayId, name) {
+  if (!dayId) return [];
+  return state.recentPhotos.filter(p => !p.completion_id && p.day_id === dayId && p.user_name === name);
 }
 // Thumbnail strip for a completion. `canAdd` renders the dashed add tile (wired via data-action).
 function photoStripHtml(completion, canAdd) {
@@ -879,18 +885,26 @@ function pickPhotos(max) {
     input.click();
   });
 }
-async function uploadPhotos(completionId, files) {
-  const existing = photosFor(completionId).length;
+// `target` is { completionId } for a finished entry, or { dayId, userName } to save
+// photos before the person has marked done.
+async function uploadPhotos(target, files) {
+  const existing = target.completionId
+    ? photosFor(target.completionId).length
+    : pendingPhotosFor(target.dayId, target.userName).length;
   const room = Math.max(0, MAX_PHOTOS - existing);
   const batch = files.slice(0, room);
   if (files.length > room) toast(`Only ${MAX_PHOTOS} photos per day — kept the first ${room}`);
+  const folder = target.completionId || `${target.dayId}-${target.userName}`;
+  const row = target.completionId
+    ? { completion_id: target.completionId }
+    : { day_id: target.dayId, user_name: target.userName };
   let n = 0;
   for (const f of batch) {
     const blob = await resizeImage(f);
-    const path = `${completionId}/${Date.now()}-${n}.jpg`;
+    const path = `${folder}/${Date.now()}-${n}.jpg`;
     const { error: upErr } = await sb.storage.from(PHOTO_BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false });
     if (upErr) throw new Error('Upload failed: ' + upErr.message);
-    const { error: rowErr } = await sb.from('tt_photo').insert({ completion_id: completionId, path });
+    const { error: rowErr } = await sb.from('tt_photo').insert({ ...row, path });
     if (rowErr) throw new Error('Could not save photo: ' + rowErr.message);
     n++;
   }
@@ -903,9 +917,8 @@ async function deletePhoto(photo) {
 }
 function openLightbox(photo) {
   document.querySelectorAll('.lightbox').forEach(l => l.remove());
-  const comp = state.recentCompletions.find(c => c.id === photo.completion_id);
-  const day = comp ? state.recentDays.find(d => d.id === comp.day_id) : null;
-  const cap = [comp && comp.user_name, day && day.area, day && fmtDayShort(day.day_date)].filter(Boolean).join(' · ');
+  const day = state.recentDays.find(d => d.id === photo.day_id);
+  const cap = [photo.user_name, day && day.area, day && fmtDayShort(day.day_date)].filter(Boolean).join(' · ');
   const box = document.createElement('div');
   box.className = 'lightbox';
   box.innerHTML = `
@@ -926,35 +939,6 @@ function openLightbox(photo) {
       toast('Photo removed');
     } catch (e) { toast(e.message); }
   };
-  document.body.appendChild(box);
-}
-// Remove a not-yet-uploaded photo from the Mark Done form, keeping typed note/minutes.
-function unstagePhoto(idx) {
-  const note = document.getElementById('done-note')?.value ?? '';
-  const mins = document.getElementById('done-mins')?.value ?? '';
-  state.pendingDonePhotos.splice(idx, 1);
-  render();
-  const n = document.getElementById('done-note'); if (n) n.value = note;
-  const m = document.getElementById('done-mins'); if (m) m.value = mins;
-}
-// Big preview of a staged (local, not yet uploaded) photo with an explicit Remove.
-function openStagedPreview(idx) {
-  const f = state.pendingDonePhotos[idx];
-  if (!f) return;
-  document.querySelectorAll('.lightbox').forEach(l => l.remove());
-  const url = URL.createObjectURL(f);
-  const box = document.createElement('div');
-  box.className = 'lightbox';
-  box.innerHTML = `
-    <button class="sheet-x" type="button" aria-label="Close">✕</button>
-    <img src="${url}" alt="" />
-    <div class="cap">Will upload when you tap I'm Done</div>
-    <button class="danger-btn" type="button">Remove this photo</button>
-  `;
-  const close = () => { box.remove(); URL.revokeObjectURL(url); };
-  box.querySelector('.sheet-x').onclick = close;
-  box.addEventListener('click', ev => { if (ev.target === box) close(); });
-  box.querySelector('.danger-btn').onclick = () => { close(); unstagePhoto(idx); toast('Photo removed'); };
   document.body.appendChild(box);
 }
 // Reload data and re-render, then re-open the day sheet if one was open so photo strips update.
@@ -1237,15 +1221,7 @@ async function markDone(note, minutes) {
     await refresh();
     return;
   }
-  // Photos staged in the form upload after the completion row exists. A failed upload
-  // still leaves the completion in place — she can retry from the person row.
-  if (state.pendingDonePhotos.length > 0) {
-    const btn = document.querySelector('[data-action="done"]');
-    if (btn) btn.textContent = 'Uploading photos…';
-    try { await uploadPhotos(row.id, state.pendingDonePhotos); }
-    catch (e) { toast(e.message); }
-    state.pendingDonePhotos = [];
-  }
+  // Photos saved from the form beforehand are attached by a DB trigger on this insert.
   await refresh();
   celebrate(state.who);
 }
@@ -1375,7 +1351,10 @@ function render() {
     return;
   }
 
+  // Keep what's typed in the Mark Done form across re-renders (photo saves, live updates).
+  const typed = ['done-note', 'done-mins'].map(id => [id, document.getElementById(id)?.value]);
   app.innerHTML = renderTopbar() + renderTabs() + renderBody();
+  typed.forEach(([id, v]) => { const f = document.getElementById(id); if (f && v) f.value = v; });
   attachHandlers();
 }
 
@@ -1517,15 +1496,16 @@ function renderToday() {
   html += `</div>`;
 
   if (!myCompletion) {
-    // Staged photos (not yet uploaded) preview as object URLs
+    // Photos already saved for today (uploaded as soon as they're picked)
+    const pending = pendingPhotosFor(state.today.day.id, state.who);
     let staged = `<div class="photo-strip">`;
-    state.pendingDonePhotos.forEach((f, i) => {
+    pending.forEach(ph => {
       staged += `<span class="staged">
-        <img class="photo-thumb" src="${URL.createObjectURL(f)}" alt="" data-action="preview-staged" data-idx="${i}" />
-        <button class="x" type="button" data-action="unstage-photo" data-idx="${i}" aria-label="Remove photo">✕</button>
+        <img class="photo-thumb" src="${esc(photoUrl(ph.path))}" alt="" data-action="view-photo" data-photo-id="${esc(ph.id)}" />
+        <button class="x" type="button" data-action="remove-pending-photo" data-photo-id="${esc(ph.id)}" aria-label="Remove photo">✕</button>
       </span>`;
     });
-    if (state.pendingDonePhotos.length < MAX_PHOTOS) {
+    if (pending.length < MAX_PHOTOS) {
       staged += `<button class="photo-add" type="button" data-action="stage-photo"><span class="ic">📷</span>Photo</button>`;
     }
     staged += `</div>`;
@@ -1540,7 +1520,7 @@ function renderToday() {
           <label for="done-mins">Minutes (optional)</label>
           <input id="done-mins" type="number" min="1" max="600" placeholder="e.g. 25" inputmode="numeric" />
         </div>
-        <label>Photos (optional, up to ${MAX_PHOTOS})</label>
+        <label>Photos (optional, up to ${MAX_PHOTOS}). Saved as soon as you add them.</label>
         ${staged}
         <button class="btn btn-primary" data-action="done" type="button">I'm Done ✓</button>
       </div>
@@ -2031,23 +2011,25 @@ function attachHandlers() {
         return;
       }
       if (action === 'stage-photo') {
-        const files = await pickPhotos(MAX_PHOTOS - state.pendingDonePhotos.length);
+        const dayId = state.today.day.id;
+        const files = await pickPhotos(MAX_PHOTOS - pendingPhotosFor(dayId, state.who).length);
         if (files.length === 0) return;
-        // Preserve typed note/minutes across the re-render
-        const note = document.getElementById('done-note')?.value ?? '';
-        const mins = document.getElementById('done-mins')?.value ?? '';
-        state.pendingDonePhotos = state.pendingDonePhotos.concat(files).slice(0, MAX_PHOTOS);
-        render();
-        const n = document.getElementById('done-note'); if (n) n.value = note;
-        const m = document.getElementById('done-mins'); if (m) m.value = mins;
+        el.disabled = true; el.innerHTML = '<span class="ic">⏳</span>…';
+        try {
+          const n = await uploadPhotos({ dayId, userName: state.who }, files);
+          await refresh();
+          toast(`${n} photo${n === 1 ? '' : 's'} saved 📷`);
+        } catch (e) {
+          toast(e.message);
+          if (document.body.contains(el)) { el.disabled = false; el.innerHTML = '<span class="ic">📷</span>Photo'; }
+        }
         return;
       }
-      if (action === 'unstage-photo') {
-        unstagePhoto(parseInt(el.getAttribute('data-idx'), 10));
-        return;
-      }
-      if (action === 'preview-staged') {
-        openStagedPreview(parseInt(el.getAttribute('data-idx'), 10));
+      if (action === 'remove-pending-photo') {
+        const photo = state.recentPhotos.find(p => p.id === el.getAttribute('data-photo-id'));
+        if (!photo || !confirm('Remove this photo?')) return;
+        try { await deletePhoto(photo); await refresh(); toast('Photo removed'); }
+        catch (e) { toast(e.message); }
         return;
       }
       if (action === 'add-photo') {
@@ -2056,7 +2038,7 @@ function attachHandlers() {
         if (files.length === 0) return;
         el.disabled = true; el.innerHTML = '<span class="ic">⏳</span>…';
         try {
-          const n = await uploadPhotos(completionId, files);
+          const n = await uploadPhotos({ completionId }, files);
           await refreshKeepingSheet();
           toast(`${n} photo${n === 1 ? '' : 's'} added 📷`);
         } catch (e) {

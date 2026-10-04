@@ -14,10 +14,12 @@ Single-file vanilla-JS Supabase app for Kara, Rachel, Ashley, Gail's daily deep-
 ```sql
 tt_day        (id, day_date unique, area, picker, picker_note, picked_at)
 tt_completion (id, day_id fk, user_name, minutes_spent, note, completed_at, unique(day_id, user_name))
-tt_photo      (id, completion_id fk cascade, path, created_at)   -- up to 4 per completion, enforced app-side
+tt_photo      (id, completion_id fk cascade NULLABLE, day_id fk cascade, user_name, path, created_at)   -- up to 4, enforced app-side
 ```
 
 Photos live in the public Storage bucket `tt-photos` (5 MB cap, image/* only), path `<completion_id>/<ts>-<n>.jpg`. The browser resizes to 1280px JPEG before upload. Deleting a photo removes the storage object then the row. Migration: `tidy_tolzmanns_photos`.
+
+**Photos before done (2026-10-04, from Kara's feedback):** photos picked in the Mark Done form upload immediately as rows with `completion_id = null`, keyed by `(day_id, user_name)`, path `<day_id>-<name>/<ts>-<n>.jpg`. They only show in that person's own form until she marks done. Trigger `tt_completion_adopt_photos` (after insert on `tt_completion`) attaches them to the new completion on any done path; trigger `tt_photo_fill` (before insert on `tt_photo`) fills `day_id`/`user_name` from the completion, or attaches to an existing completion. `render()` preserves the typed note/minutes across re-renders. Migration: `tidy_tolzmanns_pending_photos`.
 
 ## Push reminders (pick-day nudges)
 
