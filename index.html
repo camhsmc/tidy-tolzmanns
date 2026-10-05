@@ -516,6 +516,25 @@
   .release-item .t { font-weight: 700; font-size: 15px; color: var(--ink); }
   .release-item .d { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
 
+  /* ---- Sign-in gate (covers everything until access is confirmed) ---- */
+  .auth-gate {
+    position: fixed; inset: 0; z-index: 1000;
+    background: var(--cream);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; text-align: center;
+  }
+  .auth-gate[hidden] { display: none; }
+  .auth-gate .auth-box { width: 100%; max-width: 340px; }
+  .auth-gate h1 { margin: 0 0 8px; font-size: 32px; }
+  .auth-gate p { margin: 0 0 20px; color: var(--ink-soft); font-size: 15px; }
+  .auth-gate .btn { min-height: 48px; }
+  .auth-gate input {
+    display: block; width: 100%; min-height: 48px; margin-bottom: 10px;
+    padding: 10px 14px; font-size: 16px; /* 16px+ stops iOS zooming on focus */
+    border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink);
+  }
+  .auth-gate .auth-err { margin-top: 14px; color: var(--terracotta-deep); font-size: 14px; min-height: 18px; }
+
   /* ---- Misc ---- */
   .empty-state { text-align: center; padding: 30px 20px; color: var(--ink-soft); font-style: italic; }
   .toast {
@@ -670,6 +689,21 @@
 </style>
 </head>
 <body>
+
+<!-- Sign-in gate: shown until sign-in + allow-list check pass -->
+<div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-label="Sign in">
+  <div class="auth-box">
+    <h1 id="authTitle">Tidy Tolzmanns</h1>
+    <p id="authMsg">Sign in once on this device.</p>
+    <form id="authForm" novalidate>
+      <input type="text" id="authUser" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Username">
+      <input type="password" id="authPass" autocomplete="current-password" placeholder="Password">
+      <button id="authBtn" class="btn btn-primary" type="submit">Sign in</button>
+    </form>
+    <button id="authSwitchBtn" class="btn btn-secondary" type="button" hidden>Use a different account</button>
+    <div id="authErr" class="auth-err" role="alert"></div>
+  </div>
+</div>
 
 <div id="app">
   <div class="loading">Tidying…</div>
@@ -1939,6 +1973,7 @@ function attachHandlers() {
         return;
       }
       if (action === 'open-feedback') { openFeedbackSheet(); return; }
+      if (action === 'sign-out') { await sb.auth.signOut(); return; } // SIGNED_OUT listener reloads to the gate
       if (action === 'refresh') {
         try { await refresh(); toast('Refreshed'); } catch (e) { toast(e.message); }
         return;
@@ -2074,6 +2109,7 @@ function renderFeedbackCard() {
           <div class="t">Ideas & feedback</div>
           <div class="d">Have an idea to make the app better, or is something not working? Send it to Cam.</div>
           <button class="btn btn-secondary" data-action="open-feedback" type="button">Share an idea</button>
+          <button class="btn btn-ghost" data-action="sign-out" type="button" style="width: auto; padding: 6px 0; font-size: 13px; margin-top: 6px;">Sign out</button>
         </div>
       </div>
     </div>
@@ -2165,8 +2201,79 @@ function maybeShowReleaseNotes() {
   document.body.appendChild(wrap);
 }
 
-// ============== Boot ==============
-(async function boot() {
+// ============== Sign-in gate + boot ==============
+// Nothing touches the database until sign-in succeeds AND the account is on the allow-list.
+const authGate = document.getElementById('authGate');
+const authErr = document.getElementById('authErr');
+let appStarted = false;
+
+// Signed-out state: heading, sign-in button.
+function showSignedOutGate() {
+  document.getElementById('authMsg').textContent = 'Sign in once on this device.';
+  document.getElementById('authForm').hidden = false;
+  document.getElementById('authSwitchBtn').hidden = true;
+  authErr.textContent = '';
+  authGate.hidden = false;
+}
+// Signed in, but the email isn't on the allow-list.
+function showNotAllowedGate(email) {
+  email = email.replace(/@tidy\.local$/, ''); // show the short username the family typed
+  document.getElementById('authMsg').textContent = `${email} is not on the list for this app. Ask Cam to add it.`;
+  document.getElementById('authForm').hidden = true;
+  document.getElementById('authSwitchBtn').hidden = false;
+  authErr.textContent = '';
+  authGate.hidden = false;
+}
+
+// Shared username + password sign-in. Enter in either box submits the form.
+document.getElementById('authForm').onsubmit = async (ev) => {
+  ev.preventDefault();
+  const username = document.getElementById('authUser').value;
+  const password = document.getElementById('authPass').value;
+  if (!username.trim() || !password) return; // empty box: do nothing
+  const btn = document.getElementById('authBtn');
+  authErr.textContent = '';
+  btn.disabled = true;
+  // The database's accounts need an email-shaped name, so the app adds a fixed
+  // ending here and the family only ever types the short username.
+  const email = username.trim().toLowerCase() + '@tidy.local';
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      // status 0/undefined or a fetch-style message means we never reached the server
+      const offline = !error.status || /failed to fetch|network|load failed/i.test(error.message || '');
+      authErr.textContent = offline
+        ? 'Could not reach the server. Check your connection and try again.'
+        : 'That username or password is not right.';
+    }
+    // on success the SIGNED_IN listener below runs the access check
+  } catch (e) {
+    authErr.textContent = 'Could not reach the server. Check your connection and try again.';
+  }
+  btn.disabled = false;
+};
+document.getElementById('authSwitchBtn').onclick = async () => {
+  await sb.auth.signOut(); // the SIGNED_OUT listener below shows the signed-out gate
+  showSignedOutGate();
+};
+
+// Ask the database if this account is allowed, then open the app (or show the right gate).
+async function checkAccessAndStart(session) {
+  if (appStarted) return;
+  if (!session) { showSignedOutGate(); return; }
+  const { data, error } = await sb.rpc('tt_access_ok');
+  if (data === true) { authGate.hidden = true; startApp(); }
+  else if (data === false) { showNotAllowedGate(session.user.email); }
+  else {
+    // error (e.g. offline): an already-signed-in device still opens; the database enforces access anyway
+    authGate.hidden = true; startApp();
+  }
+}
+
+// The original startup code, unchanged, but only ever runs once.
+async function startApp() {
+  if (appStarted) return;
+  appStarted = true;
   try {
     await refresh();
   } catch (e) {
@@ -2177,6 +2284,17 @@ function maybeShowReleaseNotes() {
   initPush();
   // Returning users see the release list once; first-run users are busy picking a name.
   if (state.who) maybeShowReleaseNotes();
+}
+
+(async function boot() {
+  // Listener first so the SIGNED_IN from a sign-in is never missed.
+  // Don't call other sb methods directly in here (can deadlock supabase-js), so defer with setTimeout.
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN') setTimeout(() => checkAccessAndStart(session), 0);
+    else if (event === 'SIGNED_OUT') setTimeout(() => { if (!appStarted) showSignedOutGate(); else location.reload(); }, 0);
+  });
+  const { data: { session } } = await sb.auth.getSession();
+  await checkAccessAndStart(session);
 })();
 
 // Live updates: refresh on any tt_day / tt_completion change.
@@ -2209,7 +2327,7 @@ function subscribeLiveUpdates() {
 // Re-check the day every 5 minutes in case someone leaves the app open across midnight
 setInterval(() => {
   const newDate = todayCT();
-  if (newDate !== state.todayDate) refresh();
+  if (appStarted && newDate !== state.todayDate) refresh();
 }, 5 * 60 * 1000);
 </script>
 
